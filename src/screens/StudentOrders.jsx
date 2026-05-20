@@ -1,50 +1,73 @@
 import { motion } from 'framer-motion'
-import { FiFilter } from 'react-icons/fi'
+import { FiRefreshCw } from 'react-icons/fi'
+import { SkeletonCard } from '../components/Skeleton'
+import { useStudentOrders } from '../hooks/useOrders'
+import { getStatusInfo } from '../constants/orderStatus'
 
 export default function StudentOrders() {
-  const mockOrders = [
-    { id: 1, title: 'Курсовая по экономике', executor: 'Анна', rating: 4.8, status: 'В работе' },
-    { id: 2, title: 'ВКР по информатике', executor: 'Петр', rating: 4.9, status: 'Ожидание' },
-  ]
+  const { orders, loading, reload } = useStudentOrders()
 
   return (
-    <div className="min-h-screen pb-24 px-4 pt-4">
+    <div className="min-h-screen pb-24 px-4 pt-4 safe-area">
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex justify-between items-center mb-6"
+        className="flex justify-between items-center mb-5"
       >
-        <h1 className="text-2xl font-bold">Мои заказы</h1>
+        <h1 className="text-xl font-bold">Мои заказы</h1>
         <motion.button
-          whileTap={{ scale: 0.95 }}
+          whileTap={{ scale: 0.92 }}
+          onClick={reload}
           className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800"
+          aria-label="Обновить"
         >
-          <FiFilter size={20} />
+          <FiRefreshCw size={18} className={loading ? 'animate-spin' : ''} />
         </motion.button>
       </motion.div>
 
-      <div className="space-y-3">
-        {mockOrders.map((order, idx) => (
-          <motion.div
-            key={order.id}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: idx * 0.1 }}
-            className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700"
-          >
-            <h3 className="font-semibold mb-2">{order.title}</h3>
-            <div className="flex justify-between items-end">
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Исполнитель: {order.executor}</p>
-                <p className="text-xs text-gray-400">Рейтинг: ⭐ {order.rating}</p>
-              </div>
-              <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-1 rounded">
-                {order.status}
-              </span>
-            </div>
-          </motion.div>
-        ))}
-      </div>
+      {loading ? (
+        <>
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+        </>
+      ) : orders.length === 0 ? (
+        <div className="text-center py-10 text-sm text-gray-400">Заказов пока нет</div>
+      ) : (
+        <div className="space-y-3">
+          {orders.map((order, idx) => {
+            const info = getStatusInfo(Number(order.status), order.status_label || order.status)
+            return (
+              <motion.div
+                key={order.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: idx * 0.04 }}
+                className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700"
+              >
+                <h3 className="font-semibold mb-2 text-sm truncate">{order.title}</h3>
+                <div className="flex justify-between items-end gap-2">
+                  <div className="min-w-0">
+                    {order.type_order?.name && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                        {order.type_order.name}
+                      </p>
+                    )}
+                    {order.deadline && (
+                      <p className="text-xs text-gray-400">
+                        До {new Date(order.deadline).toLocaleDateString('ru-RU')}
+                      </p>
+                    )}
+                  </div>
+                  <span className={`text-[10px] px-2 py-1 rounded shrink-0 ${info.tone}`}>
+                    {info.label}
+                  </span>
+                </div>
+              </motion.div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

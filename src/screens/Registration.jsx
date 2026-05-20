@@ -1,240 +1,357 @@
-import { useState, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { FiCamera } from 'react-icons/fi'
+import { FiUser, FiBriefcase, FiArrowLeft, FiCheck, FiBookOpen, FiChevronDown } from 'react-icons/fi'
+import { fetchGroups, fetchTagSkills, updateProfile, updateSkills } from '../api/auth'
+import { haptic, useTelegramPhoto } from '../hooks/useTelegram'
+import { extractErrorMessage } from '../api/client'
+import Avatar from '../components/Avatar'
 
-export default function Registration({ onRegister }) {
-  const [role, setRole] = useState(null)
-  const [name, setName] = useState('')
-  const [image, setImage] = useState(null)
-  const [imagePreview, setImagePreview] = useState(null)
-  const [description, setDescription] = useState('')
-  const [selectedOptions, setSelectedOptions] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [expandedSpec, setExpandedSpec] = useState(false)
-  const fileInputRef = useRef(null)
+const EXECUTOR_KEYWORDS = ['executor', 'исполнитель', 'performer', 'ijrochi']
 
-  const executorOptions = ['Web разработка', 'Мобильная разработка', 'Дизайн', 'Писание контента', 'Переводы']
+function isExecutorGroup(group) {
+  const n = (group?.name || '').toLowerCase()
+  return EXECUTOR_KEYWORDS.some((k) => n.includes(k))
+}
 
-  const handleImageChange = (e) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      setImage(file)
-      const reader = new FileReader()
-      reader.onloadend = () => setImagePreview(reader.result)
-      reader.readAsDataURL(file)
+export default function Registration({ onCompleted }) {
+  const [groups, setGroups] = useState([])
+  const [skills, setSkills] = useState([])
+  const [loadingGroups, setLoadingGroups] = useState(true)
+  const [groupsError, setGroupsError] = useState(null)
+
+  const [selectedGroupId, setSelectedGroupId] = useState(null)
+  const [step, setStep] = useState('role')
+  const [fullName, setFullName] = useState('')
+  const [experience, setExperience] = useState('')
+  const [selectedSkillIds, setSelectedSkillIds] = useState([])
+  const [skillsOpen, setSkillsOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  const tgPhotoUrl = useTelegramPhoto()
+  const skillsRef = useRef(null)
+
+  useEffect(() => {
+    setLoadingGroups(true)
+    fetchGroups()
+      .then(setGroups)
+      .catch((e) => setGroupsError(extractErrorMessage(e, 'Не удалось загрузить роли')))
+      .finally(() => setLoadingGroups(false))
+  }, [])
+
+  const selectedGroup = useMemo(
+    () => groups.find((g) => g.id === selectedGroupId) || null,
+    [groups, selectedGroupId]
+  )
+  const isExecutor = selectedGroup ? isExecutorGroup(selectedGroup) : false
+
+  useEffect(() => {
+    if (!isExecutor) return
+    fetchTagSkills()
+      .then(setSkills)
+      .catch(() => setSkills([]))
+  }, [isExecutor])
+
+  useEffect(() => {
+    if (!skillsOpen) return
+    const handler = (e) => {
+      if (skillsRef.current && !skillsRef.current.contains(e.target)) {
+        setSkillsOpen(false)
+      }
     }
-  }
+    document.addEventListener('mousedown', handler)
+    document.addEventListener('touchstart', handler)
+    return () => {
+      document.removeEventListener('mousedown', handler)
+      document.removeEventListener('touchstart', handler)
+    }
+  }, [skillsOpen])
 
-  const toggleOption = (option) => {
-    setSelectedOptions(prev =>
-      prev.includes(option)
-        ? prev.filter(o => o !== option)
-        : [...prev, option]
+  const toggleSkill = (id) => {
+    haptic('selection')
+    setSelectedSkillIds((prev) =>
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
     )
   }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-
-    if (!name.trim()) {
-      toast.error('Пожалуйста, введите имя')
-      return
-    }
-
-    if (role === 'executor' && selectedOptions.length === 0) {
-      toast.error('Пожалуйста, выберите хотя бы одну специальность')
-      return
-    }
-
-    setLoading(true)
-    setTimeout(() => {
-      onRegister({
-        name,
-        image,
-        role,
-        ...(role === 'executor' && { description, specializations: selectedOptions })
-      })
-      toast.success('Добро пожаловать!')
-      setLoading(false)
-    }, 500)
+  const handleSelectRole = (group) => {
+    haptic('selection')
+    setSelectedGroupId(group.id)
+    setStep('profile')
   }
 
-  if (!role) {
+  const save = async () => {
+    if (!fullName.trim()) {
+      toast.error('Введите имя')
+      haptic('error')
+      return
+    }
+    if (!selectedGroupId) {
+      toast.error('Выберите роль')
+      haptic('error')
+      return
+    }
+    setSaving(true)
+    try {
+      const payload = {
+        full_name: fullName.trim(),
+        groups: [selectedGroupId],
+      }
+      if (isExecutor && experience.trim()) payload.experience = experience.trim()
+      await updateProfile(payload)
+      if (isExecutor && selectedSkillIds.length > 0) {
+        try {
+          await updateSkills(selectedSkillIds)
+        } catch {
+          // skills optional
+        }
+      }
+      haptic('success')
+      toast.success('Профиль сохранён')
+      await onCompleted?.()
+    } catch (err) {
+      haptic('error')
+      toast.error(extractErrorMessage(err, 'Не удалось сохранить'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loadingGroups) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-6 safe-area">
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (groupsError) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center">
+        <p className="text-sm text-gray-500 mb-4">{groupsError}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-semibold"
+        >
+          Перезагрузить
+        </button>
+      </div>
+    )
+  }
+
+  if (step === 'role') {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-6 safe-area bg-gradient-to-b from-blue-50/40 to-light dark:from-gray-900 dark:to-dark">
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: 'spring', stiffness: 100 }}
+          className="mb-5 p-4 rounded-2xl bg-blue-500/10"
+        >
+          <FiBookOpen size={56} className="text-blue-500" />
+        </motion.div>
+        <motion.h1
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-2xl font-bold text-center mb-2"
+        >
+          Добро пожаловать
+        </motion.h1>
+        <motion.p
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="text-sm text-gray-500 dark:text-gray-400 mb-8 text-center"
+        >
+          Выберите вашу роль
+        </motion.p>
+
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-xs"
+          transition={{ delay: 0.2 }}
+          className="w-full max-w-xs space-y-3"
         >
-          <h1 className="text-3xl font-bold mb-2 text-center">Добро пожаловать</h1>
-          <p className="text-gray-500 dark:text-gray-400 text-center mb-8">Выберите вашу роль</p>
-
-          <div className="space-y-3">
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => setRole('student')}
-              className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-4 rounded-xl transition shadow-lg"
-            >
-              👨‍🎓 Студент
-            </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => setRole('executor')}
-              className="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-4 rounded-xl transition shadow-lg"
-            >
-              ⚙️ Исполнитель
-            </motion.button>
-          </div>
+          {groups.length === 0 ? (
+            <p className="text-sm text-gray-500 text-center">Нет доступных ролей</p>
+          ) : (
+            groups.map((g) => {
+              const exec = isExecutorGroup(g)
+              return (
+                <motion.button
+                  key={g.id}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => handleSelectRole(g)}
+                  className={`w-full font-semibold py-4 rounded-xl shadow-md flex items-center justify-center gap-2 text-white ${
+                    exec ? 'bg-green-500 active:bg-green-600' : 'bg-blue-500 active:bg-blue-600'
+                  }`}
+                >
+                  {exec ? <FiBriefcase size={18} /> : <FiUser size={18} />}
+                  <span>{g.name}</span>
+                </motion.button>
+              )
+            })
+          )}
         </motion.div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6 pb-24 safe-area bg-light dark:bg-dark">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-xs"
-      >
+    <div className="min-h-screen flex flex-col px-5 pt-4 pb-24 safe-area">
+      <div className="w-full max-w-md mx-auto">
         <motion.button
-          onClick={() => setRole(null)}
-          className="text-blue-500 hover:text-blue-600 mb-6 text-sm font-medium flex items-center gap-1"
+          onClick={() => setStep('role')}
+          whileTap={{ scale: 0.95 }}
+          className="text-blue-500 mb-5 text-sm font-medium flex items-center gap-1"
         >
-          ← Назад
+          <FiArrowLeft size={16} />
+          Назад
         </motion.button>
 
-        <h1 className="text-3xl font-bold mb-1 text-center">
-          {role === 'student' ? 'Профиль студента' : 'Профиль исполнителя'}
-        </h1>
-        <p className="text-gray-500 dark:text-gray-400 text-center mb-8 text-sm">Заполните информацию</p>
+        <div className="flex flex-col items-center mb-6">
+          <Avatar name={fullName || '?'} photoUrl={tgPhotoUrl} size={72} className="mb-3" />
+          <h1 className="text-xl font-bold text-center">
+            {isExecutor ? 'Профиль исполнителя' : 'Профиль студента'}
+          </h1>
+          <p className="text-gray-500 dark:text-gray-400 text-center text-sm mt-1">
+            {isExecutor ? 'Заполните информацию' : 'Введите ваше имя'}
+          </p>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {/* Photo Upload */}
-          <div>
-            <label className="block text-sm font-semibold mb-3">Фото профиля</label>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleImageChange}
-              className="hidden"
-            />
-            <motion.button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl p-6 hover:border-blue-500 dark:hover:border-blue-400 transition cursor-pointer group"
-            >
-              {imagePreview ? (
-                <div className="flex flex-col items-center gap-2">
-                  <img src={imagePreview} alt="Preview" className="w-20 h-20 rounded-lg object-cover" />
-                  <span className="text-xs text-gray-500 group-hover:text-blue-500">Нажмите чтобы изменить</span>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center gap-2">
-                  <FiCamera size={32} className="text-gray-400 group-hover:text-blue-500 transition" />
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Загрузите фото</span>
-                  <span className="text-xs text-gray-500">JPG, PNG до 10MB</span>
-                </div>
-              )}
-            </motion.button>
-          </div>
-
-          {/* Name Input */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            save()
+          }}
+          className="space-y-4"
+        >
           <div>
             <label className="block text-sm font-semibold mb-2">Ваше имя</label>
             <input
               type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
               placeholder="Иван Иванов"
-              className="w-full px-4 py-3 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition"
+              maxLength={150}
+              className="input"
+              autoFocus
             />
           </div>
 
-          {/* Executor Only Fields */}
-          <AnimatePresence>
-            {role === 'executor' && (
+          <AnimatePresence initial={false}>
+            {isExecutor && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
-                className="space-y-5"
+                className="space-y-4 overflow-visible"
               >
-                {/* Description */}
                 <div>
-                  <label className="block text-sm font-semibold mb-2">О себе</label>
+                  <label className="block text-sm font-semibold mb-2">Опыт</label>
                   <textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Расскажите о ваших навыках и опыте..."
-                    className="w-full px-4 py-3 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition resize-none"
-                    rows="3"
+                    value={experience}
+                    onChange={(e) => setExperience(e.target.value)}
+                    placeholder="Расскажите о вашем опыте..."
+                    rows={3}
+                    className="input resize-none"
                   />
                 </div>
 
-                {/* Specializations */}
-                <div>
+                <div ref={skillsRef} className="relative">
+                  <label className="block text-sm font-semibold mb-2">Специальности</label>
                   <button
                     type="button"
-                    onClick={() => setExpandedSpec(!expandedSpec)}
-                    className="w-full text-sm font-semibold mb-2 text-left px-4 py-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-400 transition flex justify-between items-center"
+                    onClick={() => {
+                      haptic('selection')
+                      setSkillsOpen((v) => !v)
+                    }}
+                    className="w-full px-4 py-3 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm flex justify-between items-center"
                   >
-                    <span>
-                      Специальности {selectedOptions.length > 0 && <span className="text-blue-500">({selectedOptions.length})</span>}
+                    <span className={selectedSkillIds.length === 0 ? 'text-gray-400' : ''}>
+                      {selectedSkillIds.length === 0
+                        ? 'Выберите специальности'
+                        : `Выбрано: ${selectedSkillIds.length}`}
                     </span>
-                    <span className="text-lg">{expandedSpec ? '−' : '+'}</span>
+                    <FiChevronDown
+                      size={16}
+                      className={`transition-transform ${skillsOpen ? 'rotate-180' : ''}`}
+                    />
                   </button>
 
                   <AnimatePresence>
-                    {expandedSpec && (
+                    {skillsOpen && (
                       <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="space-y-2 bg-gray-50 dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700"
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        className="absolute z-20 left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-64 overflow-y-auto"
                       >
-                        {executorOptions.map(option => (
-                          <motion.label
-                            key={option}
-                            whileHover={{ x: 4 }}
-                            className="flex items-center gap-3 cursor-pointer p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition"
-                          >
-                            <div className="relative flex items-center">
-                              <input
-                                type="checkbox"
-                                checked={selectedOptions.includes(option)}
-                                onChange={() => toggleOption(option)}
-                                className="w-5 h-5 rounded accent-blue-500 cursor-pointer"
-                              />
-                            </div>
-                            <span className="text-sm font-medium">{option}</span>
-                          </motion.label>
-                        ))}
+                        {skills.length === 0 ? (
+                          <p className="p-3 text-sm text-gray-400 text-center">
+                            Загрузка...
+                          </p>
+                        ) : (
+                          skills.map((s) => {
+                            const active = selectedSkillIds.includes(s.id)
+                            return (
+                              <button
+                                key={s.id}
+                                type="button"
+                                onClick={() => toggleSkill(s.id)}
+                                className={`w-full px-4 py-3 text-left text-sm flex items-center justify-between transition ${
+                                  active
+                                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300'
+                                    : 'active:bg-gray-50 dark:active:bg-gray-700'
+                                }`}
+                              >
+                                <span>{s.name}</span>
+                                {active && <FiCheck size={16} />}
+                              </button>
+                            )
+                          })
+                        )}
                       </motion.div>
                     )}
                   </AnimatePresence>
+
+                  {selectedSkillIds.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {skills
+                        .filter((s) => selectedSkillIds.includes(s.id))
+                        .map((s) => (
+                          <span
+                            key={s.id}
+                            className="text-[11px] bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full flex items-center gap-1"
+                          >
+                            {s.name}
+                            <button
+                              type="button"
+                              onClick={() => toggleSkill(s.id)}
+                              className="opacity-70 hover:opacity-100"
+                              aria-label="Убрать"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* Submit Button */}
           <motion.button
-            whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            disabled={loading}
             type="submit"
-            className="w-full bg-blue-500 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-4 rounded-xl transition mt-8 shadow-lg"
+            disabled={saving}
+            className="w-full bg-blue-500 active:bg-blue-600 disabled:opacity-50 text-white font-semibold py-4 rounded-xl mt-4 shadow-md"
           >
-            {loading ? 'Загрузка...' : 'Зарегистрироваться'}
+            {saving ? 'Сохранение...' : 'Завершить регистрацию'}
           </motion.button>
         </form>
-      </motion.div>
+      </div>
     </div>
   )
 }

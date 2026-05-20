@@ -1,151 +1,217 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense, useCallback } from 'react'
 import { Toaster } from 'react-hot-toast'
-import { FiHome, FiList, FiMessageCircle, FiDollarSign, FiUser } from 'react-icons/fi'
+import { FiHome, FiList, FiMessageCircle, FiDollarSign, FiUser, FiRefreshCw } from 'react-icons/fi'
 import { motion, AnimatePresence } from 'framer-motion'
-import StudentHome from './screens/StudentHome'
-import StudentOrders from './screens/StudentOrders'
-import StudentChat from './screens/StudentChat'
-import StudentProfile from './screens/StudentProfile'
-import ExecutorHome from './screens/ExecutorHome'
-import ExecutorOrders from './screens/ExecutorOrders'
-import ExecutorWork from './screens/ExecutorWork'
-import ExecutorFinance from './screens/ExecutorFinance'
-import ExecutorProfile from './screens/ExecutorProfile'
-import Welcome from './screens/Welcome'
-import Registration from './screens/Registration'
-import ThemeToggle from './components/ThemeToggle'
-import EditProfileModal from './modals/EditProfileModal'
-import CreateOrderModal from './modals/CreateOrderModal'
-// import TakeOrderModal from './modals/TakeOrderModal'
+import { useTelegram, useBackButton, haptic } from './hooks/useTelegram'
+import { useTheme } from './hooks/useTheme'
+import { useAuth } from './hooks/useAuth.jsx'
+
+const StudentHome = lazy(() => import('./screens/StudentHome'))
+const StudentOrders = lazy(() => import('./screens/StudentOrders'))
+const ChatList = lazy(() => import('./screens/ChatList'))
+const ChatRoom = lazy(() => import('./screens/ChatRoom'))
+const StudentProfile = lazy(() => import('./screens/StudentProfile'))
+const ExecutorHome = lazy(() => import('./screens/ExecutorHome'))
+const ExecutorOrders = lazy(() => import('./screens/ExecutorOrders'))
+const ExecutorWork = lazy(() => import('./screens/ExecutorWork'))
+const ExecutorFinance = lazy(() => import('./screens/ExecutorFinance'))
+const ExecutorProfile = lazy(() => import('./screens/ExecutorProfile'))
+const Registration = lazy(() => import('./screens/Registration'))
+const EditProfileModal = lazy(() => import('./modals/EditProfileModal'))
+const CreateOrderModal = lazy(() => import('./modals/CreateOrderModal'))
+
+function ScreenFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
+}
+
+function ErrorScreen({ message, onRetry }) {
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center">
+      <div className="w-14 h-14 rounded-full bg-red-100 dark:bg-red-900/40 text-red-500 flex items-center justify-center mb-4">
+        <FiRefreshCw size={24} />
+      </div>
+      <h2 className="text-lg font-bold mb-2">Ошибка входа</h2>
+      <p className="text-sm text-gray-500 dark:text-gray-400 mb-5 max-w-xs">{message}</p>
+      <button
+        onClick={onRetry}
+        className="bg-blue-500 active:bg-blue-600 text-white font-semibold px-5 py-3 rounded-lg text-sm"
+      >
+        Повторить
+      </button>
+    </div>
+  )
+}
 
 export default function App() {
-  const [isDark, setIsDark] = useState(true)
-  const [role, setRole] = useState(null)
-  const [isRegistered, setIsRegistered] = useState(false)
+  const { isDark, toggle: toggleTheme } = useTheme()
+  const { user, role, isNewUser, loading, error, retry, refreshProfile, logout } = useAuth()
   const [currentTab, setCurrentTab] = useState('home')
-  const [userName, setUserName] = useState('')
+  const [activeChatId, setActiveChatId] = useState(null)
   const [showEditProfile, setShowEditProfile] = useState(false)
   const [showCreateOrder, setShowCreateOrder] = useState(false)
-  const [showTakeOrder, setShowTakeOrder] = useState(false)
-  const [selectedOrder, setSelectedOrder] = useState(null)
 
-  useEffect(() => {
-    if (isDark) {
-      document.documentElement.classList.add('dark')
-      document.body.classList.add('dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-      document.body.classList.remove('dark')
-    }
-  }, [isDark])
+  useTelegram()
 
-  const toggleTheme = () => {
-    setIsDark(!isDark)
-  }
+  const handleTabChange = useCallback((tab) => {
+    haptic('selection')
+    setActiveChatId(null)
+    setCurrentTab(tab)
+  }, [])
 
-  const handleRegister = (data) => {
-    setUserName(data.name)
-    setRole(data.role)
-    setIsRegistered(true)
-  }
+  const handleOpenChat = useCallback((roomId) => {
+    haptic('selection')
+    setActiveChatId(roomId)
+  }, [])
 
-  const handleLogout = () => {
-    setRole(null)
-    setIsRegistered(false)
+  const handleCloseChat = useCallback(() => {
+    setActiveChatId(null)
+  }, [])
+
+  const handleLogout = useCallback(() => {
+    haptic('warning')
+    logout()
     setCurrentTab('home')
-    setUserName('')
-  }
+  }, [logout])
+
+  const showBackButton = role !== null && (currentTab !== 'home' || activeChatId !== null)
+  const handleBack = useCallback(() => {
+    if (activeChatId !== null) {
+      handleCloseChat()
+    } else {
+      handleTabChange('home')
+    }
+  }, [activeChatId, handleCloseChat, handleTabChange])
+  useBackButton(showBackButton, handleBack)
 
   const renderScreen = () => {
-    if (!role) {
-      return isRegistered ? (
-        <Welcome onSelectRole={setRole} />
-      ) : (
-        <Registration onRegister={handleRegister} />
-      )
+    if (loading) return <ScreenFallback />
+    if (error) return <ErrorScreen message={error} onRetry={retry} />
+
+    if (!user || isNewUser || !role) {
+      return <Registration onCompleted={refreshProfile} />
     }
 
     if (role === 'student') {
+      if (currentTab === 'chat' && activeChatId !== null) {
+        return <ChatRoom roomId={activeChatId} onBack={handleCloseChat} />
+      }
       switch (currentTab) {
         case 'home':
-          return <StudentHome userName={userName} onLogout={handleLogout} onCreateOrder={() => setShowCreateOrder(true)} />
+          return (
+            <StudentHome
+              user={user}
+              onLogout={handleLogout}
+              onCreateOrder={() => setShowCreateOrder(true)}
+            />
+          )
         case 'orders':
           return <StudentOrders />
         case 'chat':
-          return <StudentChat />
+          return <ChatList onOpenChat={handleOpenChat} />
         case 'profile':
-          return <StudentProfile userName={userName} onLogout={handleLogout} onEditProfile={() => setShowEditProfile(true)} />
+          return (
+            <StudentProfile
+              user={user}
+              isDark={isDark}
+              onToggleTheme={toggleTheme}
+              onLogout={handleLogout}
+              onEditProfile={() => setShowEditProfile(true)}
+            />
+          )
         default:
-          return <StudentHome userName={userName} onLogout={handleLogout} onCreateOrder={() => setShowCreateOrder(true)} />
+          return null
       }
     }
 
     if (role === 'executor') {
+      if (currentTab === 'chat' && activeChatId !== null) {
+        return <ChatRoom roomId={activeChatId} onBack={handleCloseChat} />
+      }
       switch (currentTab) {
         case 'home':
-          return <ExecutorHome userName={userName} onLogout={handleLogout} onTakeOrder={(order) => { setSelectedOrder(order); setShowTakeOrder(true); }} />
+          return <ExecutorHome user={user} onLogout={handleLogout} />
         case 'orders':
-          return <ExecutorOrders onTakeOrder={(order) => { setSelectedOrder(order); setShowTakeOrder(true); }} />
+          return <ExecutorOrders />
         case 'work':
           return <ExecutorWork />
+        case 'chat':
+          return <ChatList onOpenChat={handleOpenChat} />
         case 'finance':
           return <ExecutorFinance />
         case 'profile':
-          return <ExecutorProfile userName={userName} onLogout={handleLogout} onEditProfile={() => setShowEditProfile(true)} />
+          return (
+            <ExecutorProfile
+              user={user}
+              isDark={isDark}
+              onToggleTheme={toggleTheme}
+              onLogout={handleLogout}
+              onEditProfile={() => setShowEditProfile(true)}
+            />
+          )
         default:
-          return <ExecutorHome userName={userName} onLogout={handleLogout} onTakeOrder={(order) => { setSelectedOrder(order); setShowTakeOrder(true); }} />
+          return null
       }
     }
+    return null
   }
 
-  const navItems = role === 'student'
-    ? [
-      { id: 'home', label: 'Главная', icon: FiHome },
-      { id: 'orders', label: 'Мои Заказы', icon: FiList },
-      { id: 'chat', label: 'Чат', icon: FiMessageCircle },
-      { id: 'profile', label: 'Профиль', icon: FiUser },
-    ]
-    : role === 'executor'
+  const navItems = !role
+    ? []
+    : role === 'student'
       ? [
+        { id: 'home', label: 'Главная', icon: FiHome },
+        { id: 'orders', label: 'Заказы', icon: FiList },
+        { id: 'chat', label: 'Чат', icon: FiMessageCircle },
+        { id: 'profile', label: 'Профиль', icon: FiUser },
+      ]
+      : [
         { id: 'home', label: 'Заказы', icon: FiList },
         { id: 'work', label: 'Работа', icon: FiHome },
         { id: 'chat', label: 'Чат', icon: FiMessageCircle },
         { id: 'finance', label: 'Финансы', icon: FiDollarSign },
         { id: 'profile', label: 'Профиль', icon: FiUser },
       ]
-      : []
+
+  const hideNav = activeChatId !== null
 
   return (
     <div className={isDark ? 'dark' : ''}>
-      <div className="min-h-screen bg-light dark:bg-dark text-gray-900 dark:text-white transition-colors">
-        <ThemeToggle isDark={isDark} onToggle={toggleTheme} />
+      <div className="mx-auto max-w-md min-h-screen bg-light dark:bg-dark text-gray-900 dark:text-white transition-colors">
+        <Suspense fallback={<ScreenFallback />}>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={`${role ?? 'guest'}-${currentTab}-${activeChatId ?? ''}-${isNewUser}`}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
+            >
+              {renderScreen()}
+            </motion.div>
+          </AnimatePresence>
+        </Suspense>
 
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentTab}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
+        {role && navItems.length > 0 && !hideNav && (
+          <nav
+            className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 dark:bg-gray-900/95 backdrop-blur border-t border-gray-200 dark:border-gray-800 z-30"
+            style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
           >
-            {renderScreen()}
-          </motion.div>
-        </AnimatePresence>
-
-        {role && navItems.length > 0 && (
-          <nav className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 max-w-md mx-auto">
             <div className="flex justify-around">
               {navItems.map((item) => {
                 const Icon = item.icon
+                const active = currentTab === item.id
                 return (
                   <motion.button
                     key={item.id}
-                    onClick={() => setCurrentTab(item.id)}
-                    className={`flex-1 py-3 flex flex-col items-center gap-1 text-xs transition-colors ${currentTab === item.id
-                      ? 'text-blue-500 dark:text-blue-400'
-                      : 'text-gray-500 dark:text-gray-400'
-                      }`}
-                    whileTap={{ scale: 0.95 }}
+                    onClick={() => handleTabChange(item.id)}
+                    className={`flex-1 py-3 flex flex-col items-center gap-1 text-xs transition-colors ${
+                      active ? 'text-blue-500 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'
+                    }`}
+                    whileTap={{ scale: 0.92 }}
                   >
                     <Icon size={20} />
                     <span className="text-[10px]">{item.label}</span>
@@ -156,13 +222,31 @@ export default function App() {
           </nav>
         )}
 
-        <Toaster position="top-center" />
+        <Toaster
+          position="top-center"
+          toastOptions={{ style: { fontSize: 14, maxWidth: '90vw' } }}
+        />
 
-        <AnimatePresence>
-          {showEditProfile && <EditProfileModal userName={userName} onClose={() => setShowEditProfile(false)} onSave={(name) => { setUserName(name); setShowEditProfile(false); }} />}
-          {showCreateOrder && <CreateOrderModal onClose={() => setShowCreateOrder(false)} />}
-          {/* {showTakeOrder && <TakeOrderModal order={selectedOrder} onClose={() => setShowTakeOrder(false)} />} */}
-        </AnimatePresence>
+        <Suspense fallback={null}>
+          <AnimatePresence>
+            {showEditProfile && user && (
+              <EditProfileModal
+                user={user}
+                onClose={() => setShowEditProfile(false)}
+                onSaved={() => {
+                  setShowEditProfile(false)
+                  refreshProfile()
+                }}
+              />
+            )}
+            {showCreateOrder && (
+              <CreateOrderModal
+                onClose={() => setShowCreateOrder(false)}
+                onCreated={() => setShowCreateOrder(false)}
+              />
+            )}
+          </AnimatePresence>
+        </Suspense>
       </div>
     </div>
   )

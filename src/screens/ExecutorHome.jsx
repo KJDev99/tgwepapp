@@ -1,57 +1,86 @@
 import { motion } from 'framer-motion'
-import { FiLogOut } from 'react-icons/fi'
+import { FiLogOut, FiRefreshCw } from 'react-icons/fi'
 import { SkeletonCard } from '../components/Skeleton'
+import Avatar from '../components/Avatar'
+import { useExecutorOrders } from '../hooks/useOrders'
+import { getStatusInfo } from '../constants/orderStatus'
+import { useTelegramPhoto } from '../hooks/useTelegram'
 
-export default function ExecutorHome({ userName, onLogout }) {
-  const availableOrders = [
-    { id: 1, title: 'Курсовая', deadline: '20 мая', price: '5000₽' },
-    { id: 2, title: 'ВКР', deadline: '25 июня', price: '15000₽' },
-  ]
+export default function ExecutorHome({ user, onLogout }) {
+  const { orders, loading, reload } = useExecutorOrders()
+  const displayName = user?.full_name || user?.username || 'друг'
+  const tgPhotoUrl = useTelegramPhoto()
+  const photoUrl = user?.avatar_url || tgPhotoUrl
 
   return (
-    <div className="min-h-screen pb-24 px-4 pt-4">
+    <div className="min-h-screen pb-24 px-4 pt-4 safe-area">
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex justify-between items-center mb-8"
+        className="flex justify-between items-center mb-6 gap-3"
       >
-        <div>
-          <h1 className="text-2xl font-bold">Привет, {userName}! 👋</h1>
-          <p className="text-gray-500 dark:text-gray-400 text-sm">Доступные заказы</p>
+        <div className="flex items-center gap-3 min-w-0">
+          <Avatar name={displayName} photoUrl={photoUrl} size={40} />
+          <div className="min-w-0">
+            <h1 className="text-base font-bold truncate">Привет, {displayName}</h1>
+            <p className="text-gray-500 dark:text-gray-400 text-xs">Ваши заказы</p>
+          </div>
         </div>
-        <motion.button
-          whileTap={{ scale: 0.95 }}
-          onClick={onLogout}
-          className="p-2 rounded-lg bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300"
-        >
-          <FiLogOut size={20} />
-        </motion.button>
+        <div className="flex gap-1 shrink-0">
+          <motion.button
+            whileTap={{ scale: 0.92 }}
+            onClick={reload}
+            className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800"
+            aria-label="Обновить"
+          >
+            <FiRefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+          </motion.button>
+          <motion.button
+            whileTap={{ scale: 0.92 }}
+            onClick={onLogout}
+            className="p-2 rounded-lg bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-300"
+            aria-label="Выйти"
+          >
+            <FiLogOut size={18} />
+          </motion.button>
+        </div>
       </motion.div>
 
-      <div className="space-y-3">
-        {availableOrders.map((order, idx) => (
-          <motion.div
-            key={order.id}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: idx * 0.1 }}
-            className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700"
-          >
-            <h3 className="font-semibold mb-2">{order.title}</h3>
-            <div className="flex justify-between items-center mb-3">
-              <span className="text-sm text-gray-500 dark:text-gray-400">Срок: {order.deadline}</span>
-              <span className="text-green-600 dark:text-green-400 font-bold">{order.price}</span>
-            </div>
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold transition"
-            >
-              Взять заказ
-            </motion.button>
-          </motion.div>
-        ))}
-      </div>
+      {loading ? (
+        <>
+          <SkeletonCard />
+          <SkeletonCard />
+        </>
+      ) : orders.length === 0 ? (
+        <div className="text-center py-10 text-sm text-gray-400">Нет заказов</div>
+      ) : (
+        <div className="space-y-3">
+          {orders.map((order, idx) => {
+            const info = getStatusInfo(Number(order.status), order.status_label || order.status)
+            return (
+              <motion.div
+                key={order.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: idx * 0.04 }}
+                className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700"
+              >
+                <h3 className="font-semibold mb-2 text-sm truncate">
+                  {order.title || `Заказ #${order.id}`}
+                </h3>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-gray-500 dark:text-gray-400 truncate">
+                    {order.user || '—'}
+                  </span>
+                  <span className={`px-2 py-1 rounded font-semibold shrink-0 ${info.tone}`}>
+                    {info.label}
+                  </span>
+                </div>
+              </motion.div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
