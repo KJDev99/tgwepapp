@@ -1,10 +1,11 @@
 import { useState, useEffect, lazy, Suspense, useCallback } from 'react'
 import { Toaster } from 'react-hot-toast'
-import { FiHome, FiList, FiMessageCircle, FiDollarSign, FiUser, FiRefreshCw } from 'react-icons/fi'
+import { FiHome, FiList, FiMessageCircle, FiDollarSign, FiUser, FiRefreshCw, FiSend } from 'react-icons/fi'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTelegram, useBackButton, haptic } from './hooks/useTelegram'
 import { useTheme } from './hooks/useTheme'
 import { useAuth } from './hooks/useAuth.jsx'
+import { isRunningInTelegram } from './utils/telegramInitData'
 
 const StudentHome = lazy(() => import('./screens/StudentHome'))
 const StudentOrders = lazy(() => import('./screens/StudentOrders'))
@@ -29,6 +30,23 @@ function ScreenFallback() {
 }
 
 function ErrorScreen({ message, onRetry }) {
+  const insideTelegram = isRunningInTelegram()
+  const isInitDataMissing = !insideTelegram
+
+  if (isInitDataMissing) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center">
+        <div className="w-16 h-16 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-500 flex items-center justify-center mb-4">
+          <FiSend size={28} />
+        </div>
+        <h2 className="text-lg font-bold mb-2">Откройте через Telegram</h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400 max-w-xs">
+          Это приложение работает только внутри Telegram. Откройте бота и нажмите кнопку запуска.
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center">
       <div className="w-14 h-14 rounded-full bg-red-100 dark:bg-red-900/40 text-red-500 flex items-center justify-center mb-4">
