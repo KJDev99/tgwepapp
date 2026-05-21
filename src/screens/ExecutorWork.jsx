@@ -15,7 +15,9 @@ export default function ExecutorWork() {
 
   const inProgress = orders.filter((o) => {
     const s = Number(o.status)
-    return s !== 5 && s !== 6
+    if (!Number.isNaN(s)) return s !== 5 && s !== 6
+    const sLower = String(o.status || '').toLowerCase()
+    return sLower !== 'завершён' && sLower !== 'завершен' && sLower !== 'отменён' && sLower !== 'отменен'
   })
 
   const handleProgress = async (order, delta) => {

@@ -50,36 +50,57 @@ export default function ChatList({ onOpenChat }) {
         </div>
       ) : (
         <div className="space-y-2">
-          {rooms.map((room, idx) => (
-            <motion.button
-              key={room.id}
-              initial={{ opacity: 0, y: 5 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.03 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => {
-                haptic('selection')
-                onOpenChat(room.id)
-              }}
-              className="w-full text-left bg-white dark:bg-gray-800 rounded-xl p-3 shadow-sm border border-gray-200 dark:border-gray-700 flex items-center gap-3"
-            >
-              <Avatar name={room.other_user || '?'} size={44} />
-              <div className="min-w-0 flex-1">
-                <h3 className="font-semibold text-sm truncate">{room.other_user || 'Чат'}</h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                  {room.last_message || 'Нет сообщений'}
-                </p>
-              </div>
-              {room.updated_at && (
-                <span className="text-[10px] text-gray-400 shrink-0">
-                  {new Date(room.updated_at).toLocaleTimeString('ru-RU', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </span>
-              )}
-            </motion.button>
-          ))}
+          {rooms.map((room, idx) => {
+            const otherUser = room.other_user
+            const userName =
+              (otherUser && typeof otherUser === 'object'
+                ? otherUser.full_name || otherUser.username || otherUser.name
+                : otherUser) || 'Чат'
+            const userPhoto =
+              otherUser && typeof otherUser === 'object'
+                ? otherUser.avatar_url || otherUser.photo_url
+                : undefined
+            const lastMessage = room.last_message
+            const lastText =
+              lastMessage && typeof lastMessage === 'object'
+                ? lastMessage.has_attachments
+                  ? lastMessage.text || '📎 Вложение'
+                  : lastMessage.text
+                : lastMessage
+            const lastTime =
+              (lastMessage && typeof lastMessage === 'object' && lastMessage.created_at) ||
+              room.updated_at
+            return (
+              <motion.button
+                key={room.id}
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.03 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => {
+                  haptic('selection')
+                  onOpenChat(room.id)
+                }}
+                className="w-full text-left bg-white dark:bg-gray-800 rounded-xl p-3 shadow-sm border border-gray-200 dark:border-gray-700 flex items-center gap-3"
+              >
+                <Avatar name={userName} photoUrl={userPhoto} size={44} />
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-semibold text-sm truncate">{userName}</h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                    {lastText || 'Нет сообщений'}
+                  </p>
+                </div>
+                {lastTime && (
+                  <span className="text-[10px] text-gray-400 shrink-0">
+                    {new Date(lastTime).toLocaleTimeString('ru-RU', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </span>
+                )}
+              </motion.button>
+            )
+          })}
         </div>
       )}
     </div>

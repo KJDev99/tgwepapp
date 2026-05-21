@@ -18,7 +18,18 @@ export async function fetchStudentOrders({ page = 1, limit = 20 } = {}) {
 
 export async function fetchExecutorOrders({ page = 1, limit = 20 } = {}) {
   const { data } = await api.get(ENDPOINTS.ordersExecutor, { params: { page, limit } })
-  return unwrapList(data)
+  const result = unwrapList(data)
+  result.items = result.items.map((entry) => {
+    if (entry && entry.order && typeof entry.order === 'object') {
+      return {
+        ...entry.order,
+        assignment_id: entry.id,
+        executor_id: entry.executor,
+      }
+    }
+    return entry
+  })
+  return result
 }
 
 export async function fetchOrderTypes() {

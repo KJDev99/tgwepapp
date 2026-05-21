@@ -102,7 +102,9 @@ export default function OrderDetailModal({ orderId, onClose, onChanged }) {
     setEditDeadline(order.deadline ? order.deadline.slice(0, 10) : '')
     setEditDescription(order.description || '')
     setEditPrice(order.price ? String(order.price) : '')
-    const list = (order.items || []).map((it) => it.title || '')
+    const list = (order.items || []).map((it) =>
+      typeof it === 'object' && it ? it.title || '' : String(it || '')
+    )
     setEditItems(list.length > 0 ? list : [''])
     setEditMode(true)
   }
@@ -146,7 +148,7 @@ export default function OrderDetailModal({ orderId, onClose, onChanged }) {
       const filled = editItems.map((s) => s.trim()).filter(Boolean)
       const payload = {
         title: editTitle.trim(),
-        items: filled.map((title) => ({ title })),
+        items: filled,
       }
       if (editDeadline) payload.deadline = new Date(editDeadline).toISOString()
       payload.description = editDescription.trim()
@@ -386,14 +388,19 @@ function DetailView({ order, executors, executorsLoading, assigningId, onAssign 
         </p>
         {order.items && order.items.length > 0 ? (
           <ul className="space-y-1">
-            {order.items.map((it) => (
-              <li
-                key={it.id}
-                className="text-sm bg-gray-50 dark:bg-gray-700/40 rounded-lg px-3 py-2"
-              >
-                {it.title}
-              </li>
-            ))}
+            {order.items.map((it, idx) => {
+              const isObj = typeof it === 'object' && it !== null
+              const label = isObj ? it.title : String(it)
+              const key = isObj ? it.id ?? idx : idx
+              return (
+                <li
+                  key={key}
+                  className="text-sm bg-gray-50 dark:bg-gray-700/40 rounded-lg px-3 py-2"
+                >
+                  {label}
+                </li>
+              )
+            })}
           </ul>
         ) : (
           <p className="text-sm">—</p>

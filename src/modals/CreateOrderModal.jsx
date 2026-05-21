@@ -131,7 +131,7 @@ export default function CreateOrderModal({ onClose, onCreated }) {
       const payload = {
         title: theme.trim(),
         type_order: orderTypeId,
-        items: filledItems.map((title) => ({ title })),
+        items: filledItems,
       }
       if (deadline) payload.deadline = new Date(deadline).toISOString()
       if (description.trim()) payload.description = description.trim()
