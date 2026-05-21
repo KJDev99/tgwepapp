@@ -24,6 +24,8 @@ export function AuthProvider({ children }) {
 
   const doLogin = useCallback(async () => {
     const initData = getInitData()
+    console.log(initData, 'tginit');
+
     if (!initData) {
       throw new Error('Telegram initData topilmadi. Botda Mini App orqali oching.')
     }

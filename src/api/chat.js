@@ -29,16 +29,3 @@ export async function sendMessageRest(roomId, { text, files = [] }) {
   })
   return data
 }
-
-export function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onloadend = () => {
-      const result = reader.result
-      const comma = String(result).indexOf(',')
-      resolve(comma >= 0 ? String(result).slice(comma + 1) : String(result))
-    }
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })
-}

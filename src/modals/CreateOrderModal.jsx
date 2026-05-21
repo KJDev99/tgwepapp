@@ -1,11 +1,15 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { FiX, FiCheck } from 'react-icons/fi'
+import { FiX, FiCheck, FiPaperclip, FiImage } from 'react-icons/fi'
 import toast from 'react-hot-toast'
 import { ORDER_TYPES } from '../constants/mockData'
 import { createOrder } from '../api/orders'
 import { extractErrorMessage } from '../api/client'
 import { haptic } from '../hooks/useTelegram'
+import { prepareFile, validateFile, filesToBase64Payload } from '../utils/files'
+import FilePreview from '../components/FilePreview'
+
+const MAX_TOTAL_FILES = 10
 
 export default function CreateOrderModal({ onClose, onCreated }) {
   const [step, setStep] = useState(1)
@@ -14,9 +18,11 @@ export default function CreateOrderModal({ onClose, onCreated }) {
   const [deadline, setDeadline] = useState('')
   const [description, setDescription] = useState('')
   const [price, setPrice] = useState('')
+  const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(false)
+  const [processingFiles, setProcessingFiles] = useState(false)
 
-  const totalSteps = 4
+  const totalSteps = 5
 
   const handleNext = () => {
     if (step === 1 && !orderType) {
@@ -33,8 +39,49 @@ export default function CreateOrderModal({ onClose, onCreated }) {
     setStep((s) => s + 1)
   }
 
+  const addFiles = async (incoming) => {
+    if (incoming.length === 0) return
+    if (files.length + incoming.length > MAX_TOTAL_FILES) {
+      toast.error(`Максимум ${MAX_TOTAL_FILES} файлов`)
+      haptic('error')
+      return
+    }
+    setProcessingFiles(true)
+    const accepted = []
+    for (const raw of incoming) {
+      const check = validateFile(raw)
+      if (!check.ok) {
+        toast.error(check.reason)
+        haptic('error')
+        continue
+      }
+      try {
+        const prepared = await prepareFile(raw)
+        accepted.push(prepared)
+      } catch {
+        toast.error(`${raw.name}: ошибка обработки`)
+      }
+    }
+    if (accepted.length > 0) {
+      setFiles((prev) => [...prev, ...accepted])
+      haptic('light')
+    }
+    setProcessingFiles(false)
+  }
+
+  const handleFilesPicked = (e) => {
+    const arr = Array.from(e.target.files || [])
+    e.target.value = ''
+    addFiles(arr)
+  }
+
+  const removeFile = (i) => {
+    haptic('selection')
+    setFiles((prev) => prev.filter((_, idx) => idx !== i))
+  }
+
   const handleCreate = async () => {
-    if (loading) return
+    if (loading || processingFiles) return
     setLoading(true)
     try {
       const payload = {
@@ -44,6 +91,9 @@ export default function CreateOrderModal({ onClose, onCreated }) {
       if (deadline) payload.deadline = new Date(deadline).toISOString()
       if (description.trim()) payload.description = description.trim()
       if (price.trim()) payload.price = price.trim()
+      if (files.length > 0) {
+        payload.files = await filesToBase64Payload(files)
+      }
 
       await createOrder(payload)
       haptic('success')
@@ -125,9 +175,7 @@ export default function CreateOrderModal({ onClose, onCreated }) {
                 maxLength={255}
                 className="w-full px-4 py-3 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 focus:outline-none focus:border-blue-500 min-h-32 resize-none text-sm"
               />
-              <p className="text-[10px] text-gray-400 mt-1 text-right">
-                {theme.length}/255
-              </p>
+              <p className="text-[10px] text-gray-400 mt-1 text-right">{theme.length}/255</p>
             </div>
           )}
 
@@ -168,6 +216,36 @@ export default function CreateOrderModal({ onClose, onCreated }) {
               />
             </div>
           )}
+
+          {step === 5 && (
+            <div>
+              <label className="block text-sm font-medium mb-2">Файлы (опционально)</label>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                Изображения автоматически сжимаются · до {MAX_TOTAL_FILES} файлов
+              </p>
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <FilePickerButton accept="image/*" onPick={addFiles} icon={FiImage} label="Фото" />
+                <FilePickerButton onPick={addFiles} icon={FiPaperclip} label="Файл" />
+              </div>
+              {processingFiles && (
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 text-center py-1">
+                  Обработка...
+                </p>
+              )}
+              {files.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {files.map((f, i) => (
+                    <FilePreview
+                      key={`${f.name}-${i}`}
+                      file={f}
+                      onRemove={() => removeFile(i)}
+                      size="lg"
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex gap-2 mt-5">
@@ -186,7 +264,7 @@ export default function CreateOrderModal({ onClose, onCreated }) {
           <motion.button
             whileTap={{ scale: 0.98 }}
             onClick={step === totalSteps ? handleCreate : handleNext}
-            disabled={loading}
+            disabled={loading || processingFiles}
             className={`flex-1 ${
               step === totalSteps
                 ? 'bg-green-500 active:bg-green-600'
@@ -198,5 +276,27 @@ export default function CreateOrderModal({ onClose, onCreated }) {
         </div>
       </motion.div>
     </motion.div>
+  )
+}
+
+function FilePickerButton({ accept, onPick, icon: Icon, label }) {
+  return (
+    <label className="cursor-pointer">
+      <input
+        type="file"
+        multiple
+        accept={accept}
+        onChange={(e) => {
+          const arr = Array.from(e.target.files || [])
+          e.target.value = ''
+          onPick(arr)
+        }}
+        className="hidden"
+      />
+      <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg py-4 flex flex-col items-center gap-1 text-sm text-gray-600 dark:text-gray-400 active:border-blue-500">
+        <Icon size={20} />
+        <span>{label}</span>
+      </div>
+    </label>
   )
 }

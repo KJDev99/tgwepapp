@@ -4,7 +4,8 @@ import { getAccessToken } from '../api/client'
 import { telegramAuth } from '../api/auth'
 import { setAccessToken } from '../api/client'
 import { getInitData } from '../utils/telegramInitData'
-import { sendMessageRest, fileToBase64 } from '../api/chat'
+import { sendMessageRest } from '../api/chat'
+import { filesToBase64Payload } from '../utils/files'
 
 const MAX_BACKOFF = 30000
 const PING_INTERVAL = 30000
@@ -158,9 +159,7 @@ export function useChatSocket(roomId, { onMessage } = {}) {
 
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         try {
-          const filePayload = await Promise.all(
-            files.map(async (f) => ({ name: f.name, data: await fileToBase64(f) }))
-          )
+          const filePayload = await filesToBase64Payload(files)
           wsRef.current.send(
             JSON.stringify({ type: 'send_message', text: trimmed, files: filePayload })
           )
