@@ -20,6 +20,7 @@ const ExecutorProfile = lazy(() => import('./screens/ExecutorProfile'))
 const Registration = lazy(() => import('./screens/Registration'))
 const EditProfileModal = lazy(() => import('./modals/EditProfileModal'))
 const CreateOrderModal = lazy(() => import('./modals/CreateOrderModal'))
+const OrderDetailModal = lazy(() => import('./modals/OrderDetailModal'))
 
 function ScreenFallback() {
   return (
@@ -71,6 +72,14 @@ export default function App() {
   const [activeChatId, setActiveChatId] = useState(null)
   const [showEditProfile, setShowEditProfile] = useState(false)
   const [showCreateOrder, setShowCreateOrder] = useState(false)
+  const [activeOrderId, setActiveOrderId] = useState(null)
+  const [ordersRefreshKey, setOrdersRefreshKey] = useState(0)
+
+  const bumpOrders = useCallback(() => setOrdersRefreshKey((k) => k + 1), [])
+  const handleOpenOrder = useCallback((id) => {
+    haptic('selection')
+    setActiveOrderId(id)
+  }, [])
 
   useTelegram()
 
@@ -124,10 +133,17 @@ export default function App() {
               user={user}
               onLogout={handleLogout}
               onCreateOrder={() => setShowCreateOrder(true)}
+              onOpenOrder={handleOpenOrder}
+              refreshKey={ordersRefreshKey}
             />
           )
         case 'orders':
-          return <StudentOrders />
+          return (
+            <StudentOrders
+              onOpenOrder={handleOpenOrder}
+              refreshKey={ordersRefreshKey}
+            />
+          )
         case 'chat':
           return <ChatList onOpenChat={handleOpenChat} />
         case 'profile':
@@ -260,7 +276,17 @@ export default function App() {
             {showCreateOrder && (
               <CreateOrderModal
                 onClose={() => setShowCreateOrder(false)}
-                onCreated={() => setShowCreateOrder(false)}
+                onCreated={() => {
+                  setShowCreateOrder(false)
+                  bumpOrders()
+                }}
+              />
+            )}
+            {activeOrderId !== null && (
+              <OrderDetailModal
+                orderId={activeOrderId}
+                onClose={() => setActiveOrderId(null)}
+                onChanged={bumpOrders}
               />
             )}
           </AnimatePresence>

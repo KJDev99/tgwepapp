@@ -4,8 +4,8 @@ import { SkeletonCard } from '../components/Skeleton'
 import { useStudentOrders } from '../hooks/useOrders'
 import { getStatusInfo } from '../constants/orderStatus'
 
-export default function StudentOrders() {
-  const { orders, loading, reload } = useStudentOrders()
+export default function StudentOrders({ onOpenOrder, refreshKey }) {
+  const { orders, loading, reload } = useStudentOrders(refreshKey)
 
   return (
     <div className="min-h-screen pb-24 px-4 pt-4 safe-area">
@@ -43,7 +43,9 @@ export default function StudentOrders() {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: idx * 0.04 }}
-                className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700"
+                whileTap={{ scale: 0.99 }}
+                onClick={() => onOpenOrder?.(order.id)}
+                className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700 cursor-pointer"
               >
                 <h3 className="font-semibold mb-2 text-sm truncate">{order.title}</h3>
                 <div className="flex justify-between items-end gap-2">

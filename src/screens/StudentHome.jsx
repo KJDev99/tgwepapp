@@ -6,8 +6,8 @@ import { useStudentOrders } from '../hooks/useOrders'
 import { getStatusInfo } from '../constants/orderStatus'
 import { haptic, useTelegramPhoto } from '../hooks/useTelegram'
 
-export default function StudentHome({ user, onLogout, onCreateOrder }) {
-  const { orders, loading } = useStudentOrders()
+export default function StudentHome({ user, onLogout, onCreateOrder, onOpenOrder, refreshKey }) {
+  const { orders, loading } = useStudentOrders(refreshKey)
   const displayName = user?.full_name || user?.username || 'друг'
   const tgPhotoUrl = useTelegramPhoto()
   const photoUrl = user?.avatar_url || tgPhotoUrl
@@ -73,7 +73,9 @@ export default function StudentHome({ user, onLogout, onCreateOrder }) {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.04 }}
-              className="bg-white dark:bg-gray-800 rounded-xl p-4 mb-3 shadow-sm border border-gray-200 dark:border-gray-700"
+              whileTap={{ scale: 0.99 }}
+              onClick={() => onOpenOrder?.(order.id)}
+              className="bg-white dark:bg-gray-800 rounded-xl p-4 mb-3 shadow-sm border border-gray-200 dark:border-gray-700 cursor-pointer"
             >
               <h3 className="font-semibold mb-1 text-sm truncate">{order.title}</h3>
               <div className="flex justify-between items-center mb-3">

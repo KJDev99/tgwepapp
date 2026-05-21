@@ -36,6 +36,11 @@ function buildOrderFormData(payload) {
       return
     }
     if (Array.isArray(value)) {
+      const hasObjects = value.some((v) => v && typeof v === 'object')
+      if (hasObjects) {
+        fd.append(key, JSON.stringify(value))
+        return
+      }
       value.forEach((v) => fd.append(key, v))
       return
     }
@@ -61,7 +66,7 @@ export async function fetchOrderDetail(orderId) {
 }
 
 export async function updateOrder(orderId, payload) {
-  const { data } = await api.put(ENDPOINTS.orderDetailStudent(orderId), payload)
+  const { data } = await api.patch(ENDPOINTS.orderDetailStudent(orderId), payload)
   return data
 }
 
@@ -72,7 +77,7 @@ export async function deleteOrder(orderId) {
 export async function fetchSuggestedExecutors(orderId) {
   const { data } = await api.get(ENDPOINTS.orderSuggestedExecutors(orderId))
   if (Array.isArray(data)) return data
-  return data?.results ?? data?.items ?? []
+  return data?.executors ?? data?.results ?? data?.items ?? []
 }
 
 export async function fetchOrderExecutors(orderId) {

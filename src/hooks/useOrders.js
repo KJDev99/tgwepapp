@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { fetchStudentOrders, fetchExecutorOrders } from '../api/orders'
 
-export function useStudentOrders() {
+export function useStudentOrders(refreshKey = 0) {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -22,7 +22,7 @@ export function useStudentOrders() {
 
   useEffect(() => {
     load()
-  }, [load])
+  }, [load, refreshKey])
 
   return { orders, loading, error, reload: load }
 }

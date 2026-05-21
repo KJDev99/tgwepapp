@@ -9,7 +9,7 @@ import { prepareFile, validateFile, formatBytes } from '../utils/files'
 import FilePreview from '../components/FilePreview'
 
 const MAX_TOTAL_FILES = 10
-const MAX_SUBJECTS = 10
+const MAX_ITEMS = 10
 
 export default function CreateOrderModal({ onClose, onCreated }) {
   const [step, setStep] = useState(1)
@@ -17,7 +17,7 @@ export default function CreateOrderModal({ onClose, onCreated }) {
   const [orderTypesLoading, setOrderTypesLoading] = useState(true)
   const [orderTypeId, setOrderTypeId] = useState(null)
   const [theme, setTheme] = useState('')
-  const [subjects, setSubjects] = useState([''])
+  const [items, setItems] = useState([''])
   const [deadline, setDeadline] = useState('')
   const [description, setDescription] = useState('')
   const [price, setPrice] = useState('')
@@ -45,7 +45,7 @@ export default function CreateOrderModal({ onClose, onCreated }) {
   }, [])
 
   const orderTypeName = orderTypes.find((t) => t.id === orderTypeId)?.name || ''
-  const filledSubjects = subjects.map((s) => s.trim()).filter(Boolean)
+  const filledItems = items.map((s) => s.trim()).filter(Boolean)
 
   const handleNext = () => {
     if (step === 1 && !orderTypeId) {
@@ -58,7 +58,7 @@ export default function CreateOrderModal({ onClose, onCreated }) {
       haptic('error')
       return
     }
-    if (step === 3 && filledSubjects.length === 0) {
+    if (step === 3 && filledItems.length === 0) {
       toast.error('Добавьте хотя бы один предмет')
       haptic('error')
       return
@@ -67,26 +67,26 @@ export default function CreateOrderModal({ onClose, onCreated }) {
     setStep((s) => s + 1)
   }
 
-  const updateSubject = (idx, val) => {
-    setSubjects((prev) => prev.map((s, i) => (i === idx ? val : s)))
+  const updateItem = (idx, val) => {
+    setItems((prev) => prev.map((s, i) => (i === idx ? val : s)))
   }
 
-  const addSubject = () => {
-    if (subjects.length >= MAX_SUBJECTS) return
-    const last = subjects[subjects.length - 1]
+  const addItem = () => {
+    if (items.length >= MAX_ITEMS) return
+    const last = items[items.length - 1]
     if (!last || !last.trim()) {
       toast.error('Сначала заполните предыдущий пункт')
       haptic('error')
       return
     }
     haptic('light')
-    setSubjects((prev) => [...prev, ''])
+    setItems((prev) => [...prev, ''])
   }
 
-  const removeSubject = (idx) => {
-    if (subjects.length <= 1) return
+  const removeItem = (idx) => {
+    if (items.length <= 1) return
     haptic('selection')
-    setSubjects((prev) => prev.filter((_, i) => i !== idx))
+    setItems((prev) => prev.filter((_, i) => i !== idx))
   }
 
   const addFiles = async (incoming) => {
@@ -131,7 +131,7 @@ export default function CreateOrderModal({ onClose, onCreated }) {
       const payload = {
         title: theme.trim(),
         type_order: orderTypeId,
-        subjects: filledSubjects,
+        items: filledItems.map((title) => ({ title })),
       }
       if (deadline) payload.deadline = new Date(deadline).toISOString()
       if (description.trim()) payload.description = description.trim()
@@ -234,24 +234,24 @@ export default function CreateOrderModal({ onClose, onCreated }) {
             <div>
               <label className="block text-sm font-medium mb-2">Предметы</label>
               <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                Добавьте предметы (до {MAX_SUBJECTS})
+                Добавьте предметы (до {MAX_ITEMS})
               </p>
               <div className="space-y-2">
-                {subjects.map((subject, idx) => (
+                {items.map((item, idx) => (
                   <div key={idx} className="flex gap-2 items-center">
                     <input
                       type="text"
-                      value={subject}
-                      onChange={(e) => updateSubject(idx, e.target.value)}
+                      value={item}
+                      onChange={(e) => updateItem(idx, e.target.value)}
                       placeholder={`Предмет ${idx + 1}`}
                       maxLength={100}
                       className="flex-1 px-4 py-3 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 focus:outline-none focus:border-blue-500 text-sm"
                     />
-                    {subjects.length > 1 && (
+                    {items.length > 1 && (
                       <motion.button
                         whileTap={{ scale: 0.9 }}
                         type="button"
-                        onClick={() => removeSubject(idx)}
+                        onClick={() => removeItem(idx)}
                         className="p-3 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
                         aria-label="Удалить"
                       >
@@ -261,11 +261,11 @@ export default function CreateOrderModal({ onClose, onCreated }) {
                   </div>
                 ))}
               </div>
-              {subjects.length < MAX_SUBJECTS && (
+              {items.length < MAX_ITEMS && (
                 <motion.button
                   whileTap={{ scale: 0.98 }}
                   type="button"
-                  onClick={addSubject}
+                  onClick={addItem}
                   className="mt-3 w-full py-2.5 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 text-sm text-gray-600 dark:text-gray-400 flex items-center justify-center gap-1 active:border-blue-500"
                 >
                   <FiPlus size={16} />
@@ -352,7 +352,7 @@ export default function CreateOrderModal({ onClose, onCreated }) {
               <SummaryRow label="Тема" value={theme.trim()} multiline />
               <SummaryRow
                 label="Предметы"
-                value={filledSubjects.length > 0 ? filledSubjects.join(', ') : '—'}
+                value={filledItems.length > 0 ? filledItems.join(', ') : '—'}
                 multiline
               />
               <SummaryRow
