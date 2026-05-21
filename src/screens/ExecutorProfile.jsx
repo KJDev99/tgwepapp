@@ -7,8 +7,6 @@ import { haptic, useTelegramPhoto } from '../hooks/useTelegram'
 export default function ExecutorProfile({ user, isDark, onToggleTheme, onLogout, onEditProfile }) {
   const displayName = user?.full_name || user?.username || 'Пользователь'
   const isVerified = user?.status?.toLowerCase?.() === 'verified' || user?.status === 'active'
-  const rating = user?.rating ?? 0
-  const skillsCount = user?.skills?.length ?? 0
   const tgPhotoUrl = useTelegramPhoto()
   const photoUrl = user?.avatar_url || tgPhotoUrl
 
@@ -53,22 +51,16 @@ export default function ExecutorProfile({ user, isDark, onToggleTheme, onLogout,
           </div>
         )}
 
-        <div className="grid grid-cols-3 gap-3 mb-5 text-center">
-          <div>
-            <p className="text-xl font-bold text-blue-500">{rating}</p>
-            <p className="text-[10px] text-gray-500">Рейтинг</p>
-          </div>
-          <div>
-            <p className="text-xl font-bold text-green-500">{skillsCount}</p>
-            <p className="text-[10px] text-gray-500">Навыков</p>
-          </div>
-          <div>
-            <p className="text-xl font-bold text-purple-500">
-              {user?.groups?.length ?? 0}
+        {user?.experience && (
+          <div className="mb-5">
+            <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
+              Опыт
             </p>
-            <p className="text-[10px] text-gray-500">Группы</p>
+            <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words bg-gray-50 dark:bg-gray-700/40 rounded-lg p-3">
+              {user.experience}
+            </p>
           </div>
-        </div>
+        )}
 
         <motion.button
           whileTap={{ scale: 0.98 }}

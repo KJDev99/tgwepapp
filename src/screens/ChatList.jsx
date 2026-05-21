@@ -79,7 +79,7 @@ export default function ChatList({ onOpenChat }) {
                 whileTap={{ scale: 0.98 }}
                 onClick={() => {
                   haptic('selection')
-                  onOpenChat(room.id)
+                  onOpenChat(room)
                 }}
                 className="w-full text-left bg-white dark:bg-gray-800 rounded-xl p-3 shadow-sm border border-gray-200 dark:border-gray-700 flex items-center gap-3"
               >

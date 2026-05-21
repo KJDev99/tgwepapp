@@ -6,7 +6,10 @@ import { updateProfile } from '../api/auth'
 import { extractErrorMessage } from '../api/client'
 import { haptic } from '../hooks/useTelegram'
 
-export default function EditProfileModal({ user, onClose, onSaved }) {
+export default function EditProfileModal({ user, role, onClose, onSaved }) {
+  const isExecutor = role === 'executor'
+  const universityLabel = isExecutor ? 'Образование' : 'Университет'
+
   const [fullName, setFullName] = useState(user?.full_name || '')
   const [email, setEmail] = useState(user?.email || '')
   const [university, setUniversity] = useState(user?.university || '')
@@ -28,9 +31,12 @@ export default function EditProfileModal({ user, onClose, onSaved }) {
         full_name: fullName.trim(),
         email: email.trim() || null,
         university: university.trim() || null,
-        course: course.trim() || null,
         speciality: speciality.trim() || null,
-        experience: experience.trim() || null,
+      }
+      if (isExecutor) {
+        payload.experience = experience.trim() || null
+      } else {
+        payload.course = course.trim() || null
       }
       if (groupIds.length > 0) payload.groups = groupIds
       await updateProfile(payload)
@@ -92,7 +98,7 @@ export default function EditProfileModal({ user, onClose, onSaved }) {
               className="input"
             />
           </Field>
-          <Field label="Университет">
+          <Field label={universityLabel}>
             <input
               type="text"
               value={university}
@@ -101,15 +107,17 @@ export default function EditProfileModal({ user, onClose, onSaved }) {
               className="input"
             />
           </Field>
-          <Field label="Курс">
-            <input
-              type="text"
-              value={course}
-              onChange={(e) => setCourse(e.target.value)}
-              maxLength={250}
-              className="input"
-            />
-          </Field>
+          {!isExecutor && (
+            <Field label="Курс">
+              <input
+                type="text"
+                value={course}
+                onChange={(e) => setCourse(e.target.value)}
+                maxLength={250}
+                className="input"
+              />
+            </Field>
+          )}
           <Field label="Специальность">
             <input
               type="text"
@@ -119,14 +127,16 @@ export default function EditProfileModal({ user, onClose, onSaved }) {
               className="input"
             />
           </Field>
-          <Field label="Опыт">
-            <textarea
-              value={experience}
-              onChange={(e) => setExperience(e.target.value)}
-              rows={3}
-              className="input resize-none"
-            />
-          </Field>
+          {isExecutor && (
+            <Field label="Опыт">
+              <textarea
+                value={experience}
+                onChange={(e) => setExperience(e.target.value)}
+                rows={3}
+                className="input resize-none"
+              />
+            </Field>
+          )}
         </div>
 
         <div className="flex gap-2 mt-5">

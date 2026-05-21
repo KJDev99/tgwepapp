@@ -70,7 +70,7 @@ export default function App() {
   const { isDark, toggle: toggleTheme } = useTheme()
   const { user, role, isNewUser, loading, error, retry, refreshProfile, logout } = useAuth()
   const [currentTab, setCurrentTab] = useState('home')
-  const [activeChatId, setActiveChatId] = useState(null)
+  const [activeChat, setActiveChat] = useState(null)
   const [showEditProfile, setShowEditProfile] = useState(false)
   const [showCreateOrder, setShowCreateOrder] = useState(false)
   const [activeOrderId, setActiveOrderId] = useState(null)
@@ -89,6 +89,7 @@ export default function App() {
   const handleOpenChatTab = useCallback(() => {
     setActiveExecutorOrder(null)
     setActiveOrderId(null)
+    setActiveChat(null)
     haptic('selection')
     setCurrentTab('chat')
   }, [])
@@ -97,17 +98,17 @@ export default function App() {
 
   const handleTabChange = useCallback((tab) => {
     haptic('selection')
-    setActiveChatId(null)
+    setActiveChat(null)
     setCurrentTab(tab)
   }, [])
 
-  const handleOpenChat = useCallback((roomId) => {
+  const handleOpenChat = useCallback((room) => {
     haptic('selection')
-    setActiveChatId(roomId)
+    setActiveChat(room)
   }, [])
 
   const handleCloseChat = useCallback(() => {
-    setActiveChatId(null)
+    setActiveChat(null)
   }, [])
 
   const handleLogout = useCallback(() => {
@@ -115,14 +116,14 @@ export default function App() {
     closeWebApp()
   }, [])
 
-  const showBackButton = role !== null && (currentTab !== 'home' || activeChatId !== null)
+  const showBackButton = role !== null && (currentTab !== 'home' || activeChat !== null)
   const handleBack = useCallback(() => {
-    if (activeChatId !== null) {
+    if (activeChat !== null) {
       handleCloseChat()
     } else {
       handleTabChange('home')
     }
-  }, [activeChatId, handleCloseChat, handleTabChange])
+  }, [activeChat, handleCloseChat, handleTabChange])
   useBackButton(showBackButton, handleBack)
 
   const renderScreen = () => {
@@ -134,8 +135,8 @@ export default function App() {
     }
 
     if (role === 'student') {
-      if (currentTab === 'chat' && activeChatId !== null) {
-        return <ChatRoom roomId={activeChatId} onBack={handleCloseChat} />
+      if (currentTab === 'chat' && activeChat !== null) {
+        return <ChatRoom room={activeChat} onBack={handleCloseChat} />
       }
       switch (currentTab) {
         case 'home':
@@ -173,8 +174,8 @@ export default function App() {
     }
 
     if (role === 'executor') {
-      if (currentTab === 'chat' && activeChatId !== null) {
-        return <ChatRoom roomId={activeChatId} onBack={handleCloseChat} />
+      if (currentTab === 'chat' && activeChat !== null) {
+        return <ChatRoom room={activeChat} onBack={handleCloseChat} />
       }
       switch (currentTab) {
         case 'home':
@@ -238,7 +239,7 @@ export default function App() {
         { id: 'profile', label: 'Профиль', icon: FiUser },
       ]
 
-  const hideNav = activeChatId !== null
+  const hideNav = activeChat !== null
 
   return (
     <div className={isDark ? 'dark' : ''}>
@@ -246,7 +247,7 @@ export default function App() {
         <Suspense fallback={<ScreenFallback />}>
           <AnimatePresence mode="wait">
             <motion.div
-              key={`${role ?? 'guest'}-${currentTab}-${activeChatId ?? ''}-${isNewUser}`}
+              key={`${role ?? 'guest'}-${currentTab}-${activeChat?.id ?? ''}-${isNewUser}`}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -294,6 +295,7 @@ export default function App() {
             {showEditProfile && user && (
               <EditProfileModal
                 user={user}
+                role={role}
                 onClose={() => setShowEditProfile(false)}
                 onSaved={() => {
                   setShowEditProfile(false)

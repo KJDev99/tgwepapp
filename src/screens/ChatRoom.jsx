@@ -11,7 +11,13 @@ import AttachmentView from '../components/AttachmentView'
 
 const MAX_TOTAL_FILES = 10
 
-export default function ChatRoom({ roomId, onBack }) {
+export default function ChatRoom({ room, onBack }) {
+  const roomId = room?.id
+  const otherUser = room?.other_user
+  const userName =
+    (otherUser && typeof otherUser === 'object'
+      ? otherUser.full_name || otherUser.username || otherUser.name
+      : otherUser) || 'Чат'
   const [message, setMessage] = useState('')
   const [messages, setMessages] = useState([])
   const [files, setFiles] = useState([])
@@ -194,7 +200,7 @@ export default function ChatRoom({ roomId, onBack }) {
           <FiArrowLeft size={20} />
         </motion.button>
         <div className="flex-1 min-w-0">
-          <h1 className="font-semibold text-sm truncate">Чат</h1>
+          <h1 className="font-semibold text-sm truncate">{userName}</h1>
         </div>
       </header>
 
