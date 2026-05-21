@@ -66,7 +66,7 @@ export async function fetchOrderDetail(orderId) {
 }
 
 export async function updateOrder(orderId, payload) {
-  const { data } = await api.patch(ENDPOINTS.orderDetailStudent(orderId), payload)
+  const { data } = await api.put(ENDPOINTS.orderDetailStudent(orderId), payload)
   return data
 }
 
