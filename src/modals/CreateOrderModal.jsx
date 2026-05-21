@@ -1,20 +1,23 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { FiX, FiCheck, FiPaperclip, FiImage } from 'react-icons/fi'
+import { FiX, FiCheck, FiPaperclip, FiImage, FiPlus, FiTrash2 } from 'react-icons/fi'
 import toast from 'react-hot-toast'
-import { ORDER_TYPES } from '../constants/mockData'
-import { createOrder } from '../api/orders'
+import { createOrder, fetchOrderTypes } from '../api/orders'
 import { extractErrorMessage } from '../api/client'
 import { haptic } from '../hooks/useTelegram'
-import { prepareFile, validateFile, filesToBase64Payload } from '../utils/files'
+import { prepareFile, validateFile, formatBytes } from '../utils/files'
 import FilePreview from '../components/FilePreview'
 
 const MAX_TOTAL_FILES = 10
+const MAX_SUBJECTS = 10
 
 export default function CreateOrderModal({ onClose, onCreated }) {
   const [step, setStep] = useState(1)
-  const [orderType, setOrderType] = useState('')
+  const [orderTypes, setOrderTypes] = useState([])
+  const [orderTypesLoading, setOrderTypesLoading] = useState(true)
+  const [orderTypeId, setOrderTypeId] = useState(null)
   const [theme, setTheme] = useState('')
+  const [subjects, setSubjects] = useState([''])
   const [deadline, setDeadline] = useState('')
   const [description, setDescription] = useState('')
   const [price, setPrice] = useState('')
@@ -22,10 +25,30 @@ export default function CreateOrderModal({ onClose, onCreated }) {
   const [loading, setLoading] = useState(false)
   const [processingFiles, setProcessingFiles] = useState(false)
 
-  const totalSteps = 5
+  const totalSteps = 7
+
+  useEffect(() => {
+    let mounted = true
+    fetchOrderTypes()
+      .then((items) => {
+        if (mounted) setOrderTypes(items)
+      })
+      .catch(() => {
+        if (mounted) toast.error('Не удалось загрузить типы работ')
+      })
+      .finally(() => {
+        if (mounted) setOrderTypesLoading(false)
+      })
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  const orderTypeName = orderTypes.find((t) => t.id === orderTypeId)?.name || ''
+  const filledSubjects = subjects.map((s) => s.trim()).filter(Boolean)
 
   const handleNext = () => {
-    if (step === 1 && !orderType) {
+    if (step === 1 && !orderTypeId) {
       toast.error('Выберите тип работы')
       haptic('error')
       return
@@ -35,8 +58,35 @@ export default function CreateOrderModal({ onClose, onCreated }) {
       haptic('error')
       return
     }
+    if (step === 3 && filledSubjects.length === 0) {
+      toast.error('Добавьте хотя бы один предмет')
+      haptic('error')
+      return
+    }
     haptic('selection')
     setStep((s) => s + 1)
+  }
+
+  const updateSubject = (idx, val) => {
+    setSubjects((prev) => prev.map((s, i) => (i === idx ? val : s)))
+  }
+
+  const addSubject = () => {
+    if (subjects.length >= MAX_SUBJECTS) return
+    const last = subjects[subjects.length - 1]
+    if (!last || !last.trim()) {
+      toast.error('Сначала заполните предыдущий пункт')
+      haptic('error')
+      return
+    }
+    haptic('light')
+    setSubjects((prev) => [...prev, ''])
+  }
+
+  const removeSubject = (idx) => {
+    if (subjects.length <= 1) return
+    haptic('selection')
+    setSubjects((prev) => prev.filter((_, i) => i !== idx))
   }
 
   const addFiles = async (incoming) => {
@@ -69,12 +119,6 @@ export default function CreateOrderModal({ onClose, onCreated }) {
     setProcessingFiles(false)
   }
 
-  const handleFilesPicked = (e) => {
-    const arr = Array.from(e.target.files || [])
-    e.target.value = ''
-    addFiles(arr)
-  }
-
   const removeFile = (i) => {
     haptic('selection')
     setFiles((prev) => prev.filter((_, idx) => idx !== i))
@@ -86,14 +130,13 @@ export default function CreateOrderModal({ onClose, onCreated }) {
     try {
       const payload = {
         title: theme.trim(),
-        type_order: { name: orderType },
+        type_order: orderTypeId,
+        subjects: filledSubjects,
       }
       if (deadline) payload.deadline = new Date(deadline).toISOString()
       if (description.trim()) payload.description = description.trim()
       if (price.trim()) payload.price = price.trim()
-      if (files.length > 0) {
-        payload.files = await filesToBase64Payload(files)
-      }
+      if (files.length > 0) payload.files = files
 
       await createOrder(payload)
       haptic('success')
@@ -143,25 +186,33 @@ export default function CreateOrderModal({ onClose, onCreated }) {
           {step === 1 && (
             <div className="space-y-2">
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">Что вам нужно?</p>
-              {ORDER_TYPES.map((type) => {
-                const active = orderType === type
-                return (
-                  <motion.button
-                    key={type}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => {
-                      haptic('selection')
-                      setOrderType(type)
-                    }}
-                    className={`w-full p-3.5 rounded-lg text-left font-semibold text-sm flex items-center justify-between ${
-                      active ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700'
-                    }`}
-                  >
-                    <span>{type}</span>
-                    {active && <FiCheck size={16} />}
-                  </motion.button>
-                )
-              })}
+              {orderTypesLoading ? (
+                <p className="text-sm text-gray-500 text-center py-4">Загрузка...</p>
+              ) : orderTypes.length === 0 ? (
+                <p className="text-sm text-gray-500 text-center py-4">
+                  Типы работ недоступны
+                </p>
+              ) : (
+                orderTypes.map((type) => {
+                  const active = orderTypeId === type.id
+                  return (
+                    <motion.button
+                      key={type.id}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => {
+                        haptic('selection')
+                        setOrderTypeId(type.id)
+                      }}
+                      className={`w-full p-3.5 rounded-lg text-left font-semibold text-sm flex items-center justify-between ${
+                        active ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700'
+                      }`}
+                    >
+                      <span>{type.name}</span>
+                      {active && <FiCheck size={16} />}
+                    </motion.button>
+                  )
+                })
+              )}
             </div>
           )}
 
@@ -180,6 +231,51 @@ export default function CreateOrderModal({ onClose, onCreated }) {
           )}
 
           {step === 3 && (
+            <div>
+              <label className="block text-sm font-medium mb-2">Предметы</label>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                Добавьте предметы (до {MAX_SUBJECTS})
+              </p>
+              <div className="space-y-2">
+                {subjects.map((subject, idx) => (
+                  <div key={idx} className="flex gap-2 items-center">
+                    <input
+                      type="text"
+                      value={subject}
+                      onChange={(e) => updateSubject(idx, e.target.value)}
+                      placeholder={`Предмет ${idx + 1}`}
+                      maxLength={100}
+                      className="flex-1 px-4 py-3 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 focus:outline-none focus:border-blue-500 text-sm"
+                    />
+                    {subjects.length > 1 && (
+                      <motion.button
+                        whileTap={{ scale: 0.9 }}
+                        type="button"
+                        onClick={() => removeSubject(idx)}
+                        className="p-3 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
+                        aria-label="Удалить"
+                      >
+                        <FiTrash2 size={16} />
+                      </motion.button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {subjects.length < MAX_SUBJECTS && (
+                <motion.button
+                  whileTap={{ scale: 0.98 }}
+                  type="button"
+                  onClick={addSubject}
+                  className="mt-3 w-full py-2.5 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 text-sm text-gray-600 dark:text-gray-400 flex items-center justify-center gap-1 active:border-blue-500"
+                >
+                  <FiPlus size={16} />
+                  Добавить предмет
+                </motion.button>
+              )}
+            </div>
+          )}
+
+          {step === 4 && (
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-2">Срок</label>
@@ -205,7 +301,7 @@ export default function CreateOrderModal({ onClose, onCreated }) {
             </div>
           )}
 
-          {step === 4 && (
+          {step === 5 && (
             <div>
               <label className="block text-sm font-medium mb-2">Описание (опционально)</label>
               <textarea
@@ -217,7 +313,7 @@ export default function CreateOrderModal({ onClose, onCreated }) {
             </div>
           )}
 
-          {step === 5 && (
+          {step === 6 && (
             <div>
               <label className="block text-sm font-medium mb-2">Файлы (опционально)</label>
               <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
@@ -244,6 +340,53 @@ export default function CreateOrderModal({ onClose, onCreated }) {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {step === 7 && (
+            <div className="space-y-3">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                Проверьте данные перед отправкой
+              </p>
+              <SummaryRow label="Тип работы" value={orderTypeName} />
+              <SummaryRow label="Тема" value={theme.trim()} multiline />
+              <SummaryRow
+                label="Предметы"
+                value={filledSubjects.length > 0 ? filledSubjects.join(', ') : '—'}
+                multiline
+              />
+              <SummaryRow
+                label="Срок"
+                value={deadline ? new Date(deadline).toLocaleDateString('ru-RU') : '—'}
+              />
+              <SummaryRow label="Цена" value={price.trim() ? `${price.trim()} ₽` : '—'} />
+              <SummaryRow
+                label="Описание"
+                value={description.trim() || '—'}
+                multiline
+              />
+              <div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1.5">
+                  Файлы ({files.length})
+                </p>
+                {files.length === 0 ? (
+                  <p className="text-sm">—</p>
+                ) : (
+                  <ul className="space-y-1">
+                    {files.map((f, i) => (
+                      <li
+                        key={`${f.name}-${i}`}
+                        className="text-xs text-gray-700 dark:text-gray-300 flex justify-between gap-2"
+                      >
+                        <span className="truncate">{f.name}</span>
+                        <span className="text-gray-500 dark:text-gray-400 shrink-0">
+                          {formatBytes(f.size)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -276,6 +419,23 @@ export default function CreateOrderModal({ onClose, onCreated }) {
         </div>
       </motion.div>
     </motion.div>
+  )
+}
+
+function SummaryRow({ label, value, multiline = false }) {
+  return (
+    <div className="bg-gray-50 dark:bg-gray-700/40 rounded-lg p-3">
+      <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">
+        {label}
+      </p>
+      <p
+        className={`text-sm text-gray-900 dark:text-gray-100 ${
+          multiline ? 'whitespace-pre-wrap break-words' : 'truncate'
+        }`}
+      >
+        {value || '—'}
+      </p>
+    </div>
   )
 }
 

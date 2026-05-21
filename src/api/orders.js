@@ -21,7 +21,36 @@ export async function fetchExecutorOrders({ page = 1, limit = 20 } = {}) {
   return unwrapList(data)
 }
 
+export async function fetchOrderTypes() {
+  const { data } = await api.get(ENDPOINTS.typeOrders)
+  if (Array.isArray(data)) return data
+  return data?.results ?? []
+}
+
+function buildOrderFormData(payload) {
+  const fd = new FormData()
+  Object.entries(payload).forEach(([key, value]) => {
+    if (value === undefined || value === null) return
+    if (key === 'files' && Array.isArray(value)) {
+      value.forEach((file) => fd.append('files', file))
+      return
+    }
+    if (Array.isArray(value)) {
+      value.forEach((v) => fd.append(key, v))
+      return
+    }
+    fd.append(key, value)
+  })
+  return fd
+}
+
 export async function createOrder(payload) {
+  const hasFiles = Array.isArray(payload.files) && payload.files.length > 0
+  if (hasFiles) {
+    const fd = buildOrderFormData(payload)
+    const { data } = await api.post(ENDPOINTS.ordersStudent, fd)
+    return data
+  }
   const { data } = await api.post(ENDPOINTS.ordersStudent, payload)
   return data
 }

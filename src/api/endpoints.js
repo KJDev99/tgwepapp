@@ -15,6 +15,9 @@ export const ENDPOINTS = {
   chatRoomOpen: '/chat/rooms/open/',
   chatMessages: (roomId) => `/chat/rooms/${roomId}/messages/`,
 
+  // Orders - Meta
+  typeOrders: '/orders/type-orders/',
+
   // Orders - Student
   ordersStudent: '/orders/student/',
   orderDetailStudent: (id) => `/orders/detail/${id}/student/`,
