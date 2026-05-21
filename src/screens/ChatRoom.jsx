@@ -48,12 +48,32 @@ export default function ChatRoom({ roomId, onBack }) {
   const handleIncoming = useCallback((msg) => {
     if (!msg) return
     setMessages((prev) => {
-      const withoutLocal = prev.filter(
-        (m) => !(m.__optimistic && msg.is_from_me && m.text === msg.text)
+      const matchIdx = prev.findIndex(
+        (m) => m.__optimistic && msg.is_from_me && (m.text || '') === (msg.text || '')
       )
+      if (matchIdx >= 0) {
+        const local = prev[matchIdx]
+        local.attachments?.forEach((a) => {
+          if (a?.__local && a.url) URL.revokeObjectURL(a.url)
+        })
+      }
+      const withoutLocal = matchIdx >= 0 ? prev.filter((_, i) => i !== matchIdx) : prev
       if (withoutLocal.some((m) => m.id === msg.id)) return withoutLocal
       return [...withoutLocal, msg]
     })
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      setMessages((prev) => {
+        prev.forEach((m) =>
+          m.attachments?.forEach((a) => {
+            if (a?.__local && a.url) URL.revokeObjectURL(a.url)
+          })
+        )
+        return prev
+      })
+    }
   }, [])
 
   const { status, attempts, send, retry } = useChatSocket(roomId, { onMessage: handleIncoming })
@@ -111,12 +131,19 @@ export default function ChatRoom({ roomId, onBack }) {
     setSending(true)
     haptic('light')
 
+    const localAttachments = files.map((f, i) => ({
+      id: `local-att-${Date.now()}-${i}`,
+      url: URL.createObjectURL(f),
+      original_name: f.name,
+      __local: true,
+    }))
+
     const optimistic = {
       id: `local-${Date.now()}`,
       __optimistic: true,
       is_from_me: true,
       text: trimmed,
-      attachments: [],
+      attachments: localAttachments,
       created_at: new Date().toISOString(),
       __pending_files: files.length,
     }
@@ -130,6 +157,7 @@ export default function ChatRoom({ roomId, onBack }) {
     const ok = await send({ text: sentText, files: sentFiles })
 
     if (!ok) {
+      localAttachments.forEach((a) => URL.revokeObjectURL(a.url))
       setMessages((prev) => prev.filter((m) => m.id !== optimistic.id))
       setMessage(sentText)
       setFiles(sentFiles)

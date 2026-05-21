@@ -4,8 +4,8 @@ import { SkeletonCard } from '../components/Skeleton'
 import { useExecutorOrders } from '../hooks/useOrders'
 import { getStatusInfo } from '../constants/orderStatus'
 
-export default function ExecutorOrders() {
-  const { orders, loading, reload } = useExecutorOrders()
+export default function ExecutorOrders({ onOpenOrder, refreshKey }) {
+  const { orders, loading, reload } = useExecutorOrders(refreshKey)
 
   return (
     <div className="min-h-screen pb-24 px-4 pt-4 safe-area">
@@ -44,7 +44,9 @@ export default function ExecutorOrders() {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: idx * 0.04 }}
-                className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700"
+                whileTap={{ scale: 0.99 }}
+                onClick={() => onOpenOrder?.(order)}
+                className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700 cursor-pointer"
               >
                 <h3 className="font-semibold mb-2 text-sm truncate">
                   {order.title || `Заказ #${order.id}`}

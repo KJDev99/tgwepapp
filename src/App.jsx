@@ -21,6 +21,7 @@ const Registration = lazy(() => import('./screens/Registration'))
 const EditProfileModal = lazy(() => import('./modals/EditProfileModal'))
 const CreateOrderModal = lazy(() => import('./modals/CreateOrderModal'))
 const OrderDetailModal = lazy(() => import('./modals/OrderDetailModal'))
+const ExecutorOrderDetailModal = lazy(() => import('./modals/ExecutorOrderDetailModal'))
 
 function ScreenFallback() {
   return (
@@ -73,12 +74,23 @@ export default function App() {
   const [showEditProfile, setShowEditProfile] = useState(false)
   const [showCreateOrder, setShowCreateOrder] = useState(false)
   const [activeOrderId, setActiveOrderId] = useState(null)
+  const [activeExecutorOrder, setActiveExecutorOrder] = useState(null)
   const [ordersRefreshKey, setOrdersRefreshKey] = useState(0)
 
   const bumpOrders = useCallback(() => setOrdersRefreshKey((k) => k + 1), [])
   const handleOpenOrder = useCallback((id) => {
     haptic('selection')
     setActiveOrderId(id)
+  }, [])
+  const handleOpenExecutorOrder = useCallback((order) => {
+    haptic('selection')
+    setActiveExecutorOrder(order)
+  }, [])
+  const handleOpenChatTab = useCallback(() => {
+    setActiveExecutorOrder(null)
+    setActiveOrderId(null)
+    haptic('selection')
+    setCurrentTab('chat')
   }, [])
 
   useTelegram()
@@ -167,11 +179,28 @@ export default function App() {
       }
       switch (currentTab) {
         case 'home':
-          return <ExecutorHome user={user} onLogout={handleLogout} />
+          return (
+            <ExecutorHome
+              user={user}
+              onLogout={handleLogout}
+              onOpenOrder={handleOpenExecutorOrder}
+              refreshKey={ordersRefreshKey}
+            />
+          )
         case 'orders':
-          return <ExecutorOrders />
+          return (
+            <ExecutorOrders
+              onOpenOrder={handleOpenExecutorOrder}
+              refreshKey={ordersRefreshKey}
+            />
+          )
         case 'work':
-          return <ExecutorWork />
+          return (
+            <ExecutorWork
+              onOpenOrder={handleOpenExecutorOrder}
+              refreshKey={ordersRefreshKey}
+            />
+          )
         case 'chat':
           return <ChatList onOpenChat={handleOpenChat} />
         case 'finance':
@@ -287,6 +316,14 @@ export default function App() {
                 orderId={activeOrderId}
                 onClose={() => setActiveOrderId(null)}
                 onChanged={bumpOrders}
+              />
+            )}
+            {activeExecutorOrder !== null && (
+              <ExecutorOrderDetailModal
+                order={activeExecutorOrder}
+                onClose={() => setActiveExecutorOrder(null)}
+                onChanged={bumpOrders}
+                onOpenChat={handleOpenChatTab}
               />
             )}
           </AnimatePresence>

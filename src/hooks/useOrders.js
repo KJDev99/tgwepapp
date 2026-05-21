@@ -27,7 +27,7 @@ export function useStudentOrders(refreshKey = 0) {
   return { orders, loading, error, reload: load }
 }
 
-export function useExecutorOrders() {
+export function useExecutorOrders(refreshKey = 0) {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -48,7 +48,7 @@ export function useExecutorOrders() {
 
   useEffect(() => {
     load()
-  }, [load])
+  }, [load, refreshKey])
 
   return { orders, loading, error, reload: load }
 }

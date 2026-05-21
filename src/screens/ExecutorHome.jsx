@@ -6,8 +6,8 @@ import { useExecutorOrders } from '../hooks/useOrders'
 import { getStatusInfo } from '../constants/orderStatus'
 import { useTelegramPhoto } from '../hooks/useTelegram'
 
-export default function ExecutorHome({ user, onLogout }) {
-  const { orders, loading, reload } = useExecutorOrders()
+export default function ExecutorHome({ user, onLogout, onOpenOrder, refreshKey }) {
+  const { orders, loading, reload } = useExecutorOrders(refreshKey)
   const displayName = user?.full_name || user?.username || 'друг'
   const tgPhotoUrl = useTelegramPhoto()
   const photoUrl = user?.avatar_url || tgPhotoUrl
@@ -63,7 +63,9 @@ export default function ExecutorHome({ user, onLogout }) {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: idx * 0.04 }}
-                className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700"
+                whileTap={{ scale: 0.99 }}
+                onClick={() => onOpenOrder?.(order)}
+                className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700 cursor-pointer"
               >
                 <h3 className="font-semibold mb-2 text-sm truncate">
                   {order.title || `Заказ #${order.id}`}
