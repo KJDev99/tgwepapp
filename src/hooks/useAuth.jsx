@@ -30,6 +30,8 @@ export function AuthProvider({ children }) {
       throw new Error('Telegram initData topilmadi. Botda Mini App orqali oching.')
     }
     const res = await telegramAuth(initData)
+    console.log(res?.access_token);
+
     if (res?.access_token) setAccessToken(res.access_token)
     if (res?.user) setUser(res.user)
     setIsNewUser(Boolean(res?.is_new_user))
