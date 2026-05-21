@@ -8,6 +8,8 @@ import {
   FiPaperclip,
   FiStar,
   FiUserPlus,
+  FiCheck,
+  FiMessageCircle,
 } from 'react-icons/fi'
 import toast from 'react-hot-toast'
 import {
@@ -16,11 +18,34 @@ import {
   addOrderExecutor,
   updateOrder,
   deleteOrder,
+  completeOrder,
 } from '../api/orders'
 import { extractErrorMessage } from '../api/client'
 import { haptic } from '../hooks/useTelegram'
-import { getStatusInfo } from '../constants/orderStatus'
+import { getStatusInfo, ORDER_STATUS } from '../constants/orderStatus'
+import { absoluteMediaUrl } from '../api/endpoints'
 import Avatar from '../components/Avatar'
+
+const STATUS_BY_LABEL = (() => {
+  const map = {}
+  Object.entries(ORDER_STATUS).forEach(([num, info]) => {
+    map[info.label.toLowerCase()] = Number(num)
+  })
+  map['в работы'] = 3
+  map['завершен'] = 5
+  map['отменен'] = 6
+  return map
+})()
+
+function statusToNumber(status) {
+  if (typeof status === 'number') return status
+  if (typeof status === 'string') {
+    const n = Number(status)
+    if (!Number.isNaN(n) && ORDER_STATUS[n]) return n
+    return STATUS_BY_LABEL[status.toLowerCase()] || 0
+  }
+  return 0
+}
 
 const MAX_ITEMS = 10
 
@@ -35,7 +60,7 @@ function isEditable(order) {
   return false
 }
 
-export default function OrderDetailModal({ orderId, onClose, onChanged }) {
+export default function OrderDetailModal({ orderId, onClose, onChanged, onOpenChat }) {
   const [order, setOrder] = useState(null)
   const [loading, setLoading] = useState(true)
   const [executors, setExecutors] = useState([])
@@ -45,6 +70,8 @@ export default function OrderDetailModal({ orderId, onClose, onChanged }) {
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [completing, setCompleting] = useState(false)
+  const [confirmComplete, setConfirmComplete] = useState(false)
 
   const [editTitle, setEditTitle] = useState('')
   const [editDeadline, setEditDeadline] = useState('')
@@ -184,6 +211,26 @@ export default function OrderDetailModal({ orderId, onClose, onChanged }) {
     }
   }
 
+  const handleComplete = async () => {
+    if (completing) return
+    setCompleting(true)
+    try {
+      const data = await completeOrder(order.id, { status: 5, progress: 100 })
+      haptic('success')
+      toast.success('Заказ закрыт')
+      if (data && typeof data === 'object') {
+        setOrder((prev) => ({ ...prev, ...data }))
+      }
+      setConfirmComplete(false)
+      onChanged?.()
+    } catch (e) {
+      haptic('error')
+      toast.error(extractErrorMessage(e, 'Не удалось завершить'))
+    } finally {
+      setCompleting(false)
+    }
+  }
+
   const handleAssign = async (executorId) => {
     if (assigningId) return
     setAssigningId(executorId)
@@ -266,39 +313,74 @@ export default function OrderDetailModal({ orderId, onClose, onChanged }) {
           )}
         </div>
 
-        {!loading && order && !editMode && (
-          <div className="flex gap-2 mt-4">
-            {isEditable(order) && (
-              <>
-                <motion.button
-                  whileTap={{ scale: 0.97 }}
-                  onClick={beginEdit}
-                  className="flex-1 bg-blue-500 active:bg-blue-600 text-white py-3 rounded-lg font-semibold text-sm flex items-center justify-center gap-1.5"
-                >
-                  <FiEdit2 size={15} /> Изменить
-                </motion.button>
+        {!loading && order && !editMode && (() => {
+          const editable = isEditable(order)
+          const statusNum = statusToNumber(order.status)
+          const isFinished = statusNum === 5 || statusNum === 6
+          const progress = Number(order.progress) || 0
+          const canComplete = !editable && !isFinished && progress >= 100
+          return (
+            <div className="flex flex-col gap-2 mt-4">
+              {editable && (
+                <div className="flex gap-2">
+                  <motion.button
+                    whileTap={{ scale: 0.97 }}
+                    onClick={beginEdit}
+                    className="flex-1 bg-blue-500 active:bg-blue-600 text-white py-3 rounded-lg font-semibold text-sm flex items-center justify-center gap-1.5"
+                  >
+                    <FiEdit2 size={15} /> Изменить
+                  </motion.button>
+                  <motion.button
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => {
+                      haptic('warning')
+                      setConfirmDelete(true)
+                    }}
+                    className="flex-1 bg-red-500 active:bg-red-600 text-white py-3 rounded-lg font-semibold text-sm flex items-center justify-center gap-1.5"
+                  >
+                    <FiTrash2 size={15} /> Удалить
+                  </motion.button>
+                </div>
+              )}
+              {canComplete && (
                 <motion.button
                   whileTap={{ scale: 0.97 }}
                   onClick={() => {
                     haptic('warning')
-                    setConfirmDelete(true)
+                    setConfirmComplete(true)
                   }}
-                  className="flex-1 bg-red-500 active:bg-red-600 text-white py-3 rounded-lg font-semibold text-sm flex items-center justify-center gap-1.5"
+                  className="w-full bg-green-500 active:bg-green-600 text-white py-3 rounded-lg font-semibold text-sm flex items-center justify-center gap-1.5"
                 >
-                  <FiTrash2 size={15} /> Удалить
+                  <FiCheck size={15} /> Завершить заказ
                 </motion.button>
-              </>
-            )}
-            {!isEditable(order) && (
-              <button
-                onClick={onClose}
-                className="flex-1 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white py-3 rounded-lg font-semibold text-sm"
-              >
-                Закрыть
-              </button>
-            )}
-          </div>
-        )}
+              )}
+              {!editable && !canComplete && !isFinished && (
+                <p className="text-xs text-center text-gray-500 dark:text-gray-400 py-1">
+                  Завершить можно после 100% прогресса
+                </p>
+              )}
+              <div className="flex gap-2">
+                {onOpenChat && !editable && (
+                  <motion.button
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => onOpenChat(order)}
+                    className="flex-1 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white py-3 rounded-lg font-semibold text-sm flex items-center justify-center gap-1.5"
+                  >
+                    <FiMessageCircle size={15} /> Чат
+                  </motion.button>
+                )}
+                {(isFinished || (!editable && !canComplete)) && (
+                  <button
+                    onClick={onClose}
+                    className="flex-1 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white py-3 rounded-lg font-semibold text-sm"
+                  >
+                    Закрыть
+                  </button>
+                )}
+              </div>
+            </div>
+          )
+        })()}
 
         {!loading && order && editMode && (
           <div className="flex gap-2 mt-4">
@@ -317,6 +399,40 @@ export default function OrderDetailModal({ orderId, onClose, onChanged }) {
             >
               {saving ? 'Сохранение...' : 'Сохранить'}
             </motion.button>
+          </div>
+        )}
+
+        {confirmComplete && (
+          <div
+            className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4"
+            onClick={() => setConfirmComplete(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-gray-800 rounded-xl p-5 w-full max-w-xs"
+            >
+              <h3 className="font-semibold text-base mb-2">Завершить заказ?</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                Работа будет принята и заказ закрыт.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setConfirmComplete(false)}
+                  className="flex-1 bg-gray-200 dark:bg-gray-700 py-2.5 rounded-lg text-sm font-semibold"
+                >
+                  Отмена
+                </button>
+                <button
+                  onClick={handleComplete}
+                  disabled={completing}
+                  className="flex-1 bg-green-500 active:bg-green-600 disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-semibold"
+                >
+                  {completing ? '...' : 'Завершить'}
+                </button>
+              </div>
+            </motion.div>
           </div>
         )}
 
@@ -414,6 +530,7 @@ function DetailView({ order, executors, executorsLoading, assigningId, onAssign 
         {order.files && order.files.length > 0 ? (
           <ul className="space-y-1">
             {order.files.map((f) => {
+              const fileUrl = absoluteMediaUrl(f.order_file)
               const name = decodeURIComponent(
                 (f.order_file || '').split('/').pop() || 'файл'
               )
@@ -424,7 +541,7 @@ function DetailView({ order, executors, executorsLoading, assigningId, onAssign 
                 >
                   <FiPaperclip size={14} className="shrink-0 text-gray-400" />
                   <a
-                    href={f.order_file}
+                    href={fileUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-blue-500 truncate flex-1"

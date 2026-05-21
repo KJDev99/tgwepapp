@@ -171,9 +171,12 @@ export default function ChatRoom({ roomId, onBack }) {
   const canSend = (message.trim() || files.length > 0) && !sending && !processingFiles
 
   return (
-    <div className="min-h-screen flex flex-col safe-area">
+    <div
+      className="flex flex-col bg-light dark:bg-dark"
+      style={{ height: '100dvh' }}
+    >
       <header
-        className="sticky top-0 z-20 bg-white/95 dark:bg-gray-900/95 backdrop-blur border-b border-gray-200 dark:border-gray-800 px-3 py-3 flex items-center gap-3"
+        className="shrink-0 z-20 bg-white/95 dark:bg-gray-900/95 backdrop-blur border-b border-gray-200 dark:border-gray-800 px-3 py-3 flex items-center gap-3"
         style={{ paddingTop: 'calc(12px + env(safe-area-inset-top))' }}
       >
         <motion.button
@@ -205,7 +208,7 @@ export default function ChatRoom({ roomId, onBack }) {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-2">
         {loadingHistory ? (
           <div className="text-center text-xs text-gray-400 py-6">Загрузка...</div>
         ) : messages.length === 0 ? (
@@ -276,7 +279,7 @@ export default function ChatRoom({ roomId, onBack }) {
       )}
 
       <div
-        className="border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-2 py-2 flex gap-1 items-end"
+        className="shrink-0 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-2 py-2 flex gap-1 items-end"
         style={{ paddingBottom: 'calc(8px + env(safe-area-inset-bottom))' }}
       >
         <input

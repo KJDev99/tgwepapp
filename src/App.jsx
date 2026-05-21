@@ -2,7 +2,7 @@ import { useState, useEffect, lazy, Suspense, useCallback } from 'react'
 import { Toaster } from 'react-hot-toast'
 import { FiHome, FiList, FiMessageCircle, FiDollarSign, FiUser, FiRefreshCw, FiSend } from 'react-icons/fi'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useTelegram, useBackButton, haptic } from './hooks/useTelegram'
+import { useTelegram, useBackButton, haptic, closeWebApp } from './hooks/useTelegram'
 import { useTheme } from './hooks/useTheme'
 import { useAuth } from './hooks/useAuth.jsx'
 import { isRunningInTelegram } from './utils/telegramInitData'
@@ -112,9 +112,8 @@ export default function App() {
 
   const handleLogout = useCallback(() => {
     haptic('warning')
-    logout()
-    setCurrentTab('home')
-  }, [logout])
+    closeWebApp()
+  }, [])
 
   const showBackButton = role !== null && (currentTab !== 'home' || activeChatId !== null)
   const handleBack = useCallback(() => {
@@ -316,6 +315,7 @@ export default function App() {
                 orderId={activeOrderId}
                 onClose={() => setActiveOrderId(null)}
                 onChanged={bumpOrders}
+                onOpenChat={handleOpenChatTab}
               />
             )}
             {activeExecutorOrder !== null && (

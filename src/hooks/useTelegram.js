@@ -76,6 +76,18 @@ export function useMainButton({ text, visible, onClick, loading, disabled }) {
   }, [text, visible, onClick, loading, disabled])
 }
 
+export function closeWebApp() {
+  if (tg?.close) {
+    try {
+      tg.close()
+      return true
+    } catch {
+      // ignore
+    }
+  }
+  return false
+}
+
 export function haptic(type = 'light') {
   const hf = tg?.HapticFeedback
   if (!hf) return

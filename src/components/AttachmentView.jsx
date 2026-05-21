@@ -8,6 +8,7 @@ import {
   FiArchive,
   FiX,
 } from 'react-icons/fi'
+import { absoluteMediaUrl } from '../api/endpoints'
 
 const IMAGE_EXT = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'bmp', 'svg']
 
@@ -48,6 +49,8 @@ export default function AttachmentView({ attachment, isMine }) {
 
   if (!attachment?.url) return null
 
+  const url = absoluteMediaUrl(attachment.url)
+
   if (isImageAttachment(attachment)) {
     return (
       <>
@@ -57,7 +60,7 @@ export default function AttachmentView({ attachment, isMine }) {
           className="block rounded-lg overflow-hidden bg-black/10 mt-1"
         >
           <img
-            src={attachment.url}
+            src={url}
             alt={attachment.original_name || 'image'}
             loading="lazy"
             className="max-w-full max-h-64 object-cover"
@@ -80,7 +83,7 @@ export default function AttachmentView({ attachment, isMine }) {
               <FiX size={22} />
             </button>
             <a
-              href={attachment.url}
+              href={url}
               download={attachment.original_name}
               onClick={(e) => e.stopPropagation()}
               className="absolute top-4 left-4 w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center"
@@ -90,7 +93,7 @@ export default function AttachmentView({ attachment, isMine }) {
               <FiDownload size={20} />
             </a>
             <img
-              src={attachment.url}
+              src={url}
               alt={attachment.original_name || 'image'}
               className="max-w-full max-h-full object-contain"
               onClick={(e) => e.stopPropagation()}
@@ -106,7 +109,7 @@ export default function AttachmentView({ attachment, isMine }) {
 
   return (
     <a
-      href={attachment.url}
+      href={url}
       target="_blank"
       rel="noreferrer"
       download={attachment.original_name}

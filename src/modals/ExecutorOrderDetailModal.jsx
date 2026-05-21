@@ -1,24 +1,18 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
-import {
-  FiX,
-  FiPaperclip,
-  FiCheck,
-  FiPlus,
-  FiMessageCircle,
-} from 'react-icons/fi'
+import { FiX, FiPaperclip, FiPlus, FiMessageCircle } from 'react-icons/fi'
 import toast from 'react-hot-toast'
-import { updateOrderProgress, completeOrder } from '../api/orders'
+import { updateOrderProgress } from '../api/orders'
 import { extractErrorMessage } from '../api/client'
 import { haptic } from '../hooks/useTelegram'
 import { ORDER_STATUS, getStatusInfo } from '../constants/orderStatus'
+import { absoluteMediaUrl } from '../api/endpoints'
 
 const STATUS_BY_LABEL = (() => {
   const map = {}
   Object.entries(ORDER_STATUS).forEach(([num, info]) => {
     map[info.label.toLowerCase()] = Number(num)
   })
-  // tolerate backend grammar variants
   map['в работы'] = 3
   map['завершен'] = 5
   map['отменен'] = 6
@@ -45,22 +39,19 @@ export default function ExecutorOrderDetailModal({
 }) {
   const [order, setOrder] = useState(initialOrder)
   const [busy, setBusy] = useState(false)
-  const [confirmComplete, setConfirmComplete] = useState(false)
 
-  const currentStatusNum = statusToNumber(order?.status)
-  const currentProgress = Number(order?.progress) || 0
-  const info = getStatusInfo(currentStatusNum, order?.status_label || order?.status)
+  if (!order) return null
 
-  const allowedStatuses = useMemo(() => {
-    const list = []
-    Object.entries(ORDER_STATUS).forEach(([num, st]) => {
-      const n = Number(num)
-      if (n > currentStatusNum && n !== 6) list.push({ id: n, label: st.label, tone: st.tone })
-    })
-    return list
-  }, [currentStatusNum])
-
+  const currentStatusNum = statusToNumber(order.status)
+  const currentProgress = Number(order.progress) || 0
+  const info = getStatusInfo(currentStatusNum, order.status_label || order.status)
   const isFinished = currentStatusNum === 5 || currentStatusNum === 6
+  const canIncrease = !isFinished && currentProgress < 100
+
+  const typeName =
+    typeof order.type_order === 'object' && order.type_order
+      ? order.type_order.name
+      : order.type_order
 
   const applyResult = (data) => {
     if (data && typeof data === 'object') {
@@ -69,26 +60,8 @@ export default function ExecutorOrderDetailModal({
     onChanged?.()
   }
 
-  const handleStatusChange = async (newStatus) => {
-    if (busy || isFinished) return
-    setBusy(true)
-    try {
-      const payload = { status: newStatus }
-      if (newStatus === 5) payload.progress = 100
-      const data = await updateOrderProgress(order.id, payload)
-      haptic('success')
-      toast.success('Статус обновлён')
-      applyResult(data)
-    } catch (e) {
-      haptic('error')
-      toast.error(extractErrorMessage(e, 'Не удалось обновить'))
-    } finally {
-      setBusy(false)
-    }
-  }
-
   const handleProgress = async () => {
-    if (busy || isFinished) return
+    if (busy || !canIncrease) return
     const next = Math.min(100, currentProgress + PROGRESS_STEP)
     if (next === currentProgress) return
     setBusy(true)
@@ -103,32 +76,6 @@ export default function ExecutorOrderDetailModal({
       setBusy(false)
     }
   }
-
-  const handleComplete = async () => {
-    if (busy || isFinished) return
-    setBusy(true)
-    try {
-      const data = await completeOrder(order.id, { status: 5, progress: 100 })
-      haptic('success')
-      toast.success('Работа сдана')
-      applyResult(data)
-      setConfirmComplete(false)
-    } catch (e) {
-      haptic('error')
-      toast.error(extractErrorMessage(e, 'Не удалось завершить'))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  if (!order) {
-    return null
-  }
-
-  const typeName =
-    typeof order.type_order === 'object' && order.type_order
-      ? order.type_order.name
-      : order.type_order
 
   return (
     <motion.div
@@ -226,6 +173,7 @@ export default function ExecutorOrderDetailModal({
             {order.files && order.files.length > 0 ? (
               <ul className="space-y-1">
                 {order.files.map((f) => {
+                  const fileUrl = absoluteMediaUrl(f.order_file)
                   const name = decodeURIComponent(
                     (f.order_file || '').split('/').pop() || 'файл'
                   )
@@ -236,7 +184,7 @@ export default function ExecutorOrderDetailModal({
                     >
                       <FiPaperclip size={14} className="shrink-0 text-gray-400" />
                       <a
-                        href={f.order_file}
+                        href={fileUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-blue-500 truncate flex-1"
@@ -252,49 +200,28 @@ export default function ExecutorOrderDetailModal({
             )}
           </div>
 
-          {!isFinished && (
-            <>
-              <div>
-                <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
-                  Изменить статус
-                </p>
-                {allowedStatuses.length === 0 ? (
-                  <p className="text-sm text-gray-500 dark:text-gray-400 px-3 py-2">
-                    Нет доступных статусов
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {allowedStatuses.map((s) => (
-                      <motion.button
-                        key={s.id}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => handleStatusChange(s.id)}
-                        disabled={busy}
-                        className={`w-full text-left p-3 rounded-lg flex items-center justify-between text-sm font-semibold disabled:opacity-50 ${s.tone}`}
-                      >
-                        <span>→ {s.label}</span>
-                      </motion.button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex gap-2">
-                <motion.button
-                  whileTap={{ scale: 0.97 }}
-                  onClick={handleProgress}
-                  disabled={busy || currentProgress >= 100}
-                  className="flex-1 bg-blue-500 active:bg-blue-600 disabled:opacity-50 text-white py-3 rounded-lg font-semibold text-sm flex items-center justify-center gap-1.5"
-                >
-                  <FiPlus size={16} />+{PROGRESS_STEP}% прогресс
-                </motion.button>
-              </div>
-            </>
+          {isFinished ? (
+            <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-2">
+              Заказ {info.label.toLowerCase()}
+            </p>
+          ) : currentProgress >= 100 ? (
+            <p className="text-sm text-center py-2 text-yellow-700 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg px-3">
+              Прогресс 100% — ожидайте проверку студента
+            </p>
+          ) : (
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={handleProgress}
+              disabled={busy}
+              className="w-full bg-blue-500 active:bg-blue-600 disabled:opacity-50 text-white py-3 rounded-lg font-semibold text-sm flex items-center justify-center gap-1.5"
+            >
+              <FiPlus size={16} />+{PROGRESS_STEP}% прогресс
+            </motion.button>
           )}
         </div>
 
-        <div className="flex gap-2 mt-4">
-          {onOpenChat && (
+        {onOpenChat && (
+          <div className="flex gap-2 mt-4">
             <motion.button
               whileTap={{ scale: 0.97 }}
               onClick={() => onOpenChat(order)}
@@ -302,53 +229,6 @@ export default function ExecutorOrderDetailModal({
             >
               <FiMessageCircle size={15} /> Чат
             </motion.button>
-          )}
-          {!isFinished && (
-            <motion.button
-              whileTap={{ scale: 0.97 }}
-              onClick={() => {
-                haptic('warning')
-                setConfirmComplete(true)
-              }}
-              disabled={busy}
-              className="flex-1 bg-green-500 active:bg-green-600 disabled:opacity-50 text-white py-3 rounded-lg font-semibold text-sm flex items-center justify-center gap-1.5"
-            >
-              <FiCheck size={15} /> Завершить
-            </motion.button>
-          )}
-        </div>
-
-        {confirmComplete && (
-          <div
-            className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4"
-            onClick={() => setConfirmComplete(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-white dark:bg-gray-800 rounded-xl p-5 w-full max-w-xs"
-            >
-              <h3 className="font-semibold text-base mb-2">Завершить работу?</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                Заказ будет помечен как сдан.
-              </p>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setConfirmComplete(false)}
-                  className="flex-1 bg-gray-200 dark:bg-gray-700 py-2.5 rounded-lg text-sm font-semibold"
-                >
-                  Отмена
-                </button>
-                <button
-                  onClick={handleComplete}
-                  disabled={busy}
-                  className="flex-1 bg-green-500 active:bg-green-600 disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-semibold"
-                >
-                  {busy ? '...' : 'Завершить'}
-                </button>
-              </div>
-            </motion.div>
           </div>
         )}
       </motion.div>
