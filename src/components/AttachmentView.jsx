@@ -44,7 +44,7 @@ function iconFor(att) {
   return FiFile
 }
 
-export default function AttachmentView({ attachment, isMine }) {
+export default function AttachmentView({ attachment, isMine, onLoad }) {
   const [lightbox, setLightbox] = useState(false)
 
   if (!attachment?.url) return null
@@ -63,6 +63,7 @@ export default function AttachmentView({ attachment, isMine }) {
             src={url}
             alt={attachment.original_name || 'image'}
             loading="lazy"
+            onLoad={onLoad}
             className="max-w-full max-h-64 object-cover"
           />
         </button>

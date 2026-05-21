@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { FiX, FiPaperclip, FiPlus, FiMessageCircle } from 'react-icons/fi'
+import { FiX, FiPaperclip, FiCheck, FiMessageCircle, FiZap } from 'react-icons/fi'
 import toast from 'react-hot-toast'
 import { updateOrderProgress } from '../api/orders'
 import { extractErrorMessage } from '../api/client'
@@ -29,8 +29,6 @@ function statusToNumber(status) {
   return 0
 }
 
-const PROGRESS_STEP = 10
-
 export default function ExecutorOrderDetailModal({
   order: initialOrder,
   onClose,
@@ -39,14 +37,20 @@ export default function ExecutorOrderDetailModal({
 }) {
   const [order, setOrder] = useState(initialOrder)
   const [busy, setBusy] = useState(false)
+  const [inputValue, setInputValue] = useState('')
+
+  const currentStatusNum = statusToNumber(order?.status)
+  const currentProgress = Number(order?.progress) || 0
+
+  useEffect(() => {
+    setInputValue(String(currentProgress))
+  }, [currentProgress])
 
   if (!order) return null
 
-  const currentStatusNum = statusToNumber(order.status)
-  const currentProgress = Number(order.progress) || 0
   const info = getStatusInfo(currentStatusNum, order.status_label || order.status)
   const isFinished = currentStatusNum === 5 || currentStatusNum === 6
-  const canIncrease = !isFinished && currentProgress < 100
+  const canEdit = !isFinished && currentProgress < 100
 
   const typeName =
     typeof order.type_order === 'object' && order.type_order
@@ -60,14 +64,24 @@ export default function ExecutorOrderDetailModal({
     onChanged?.()
   }
 
-  const handleProgress = async () => {
-    if (busy || !canIncrease) return
-    const next = Math.min(100, currentProgress + PROGRESS_STEP)
+  const setProgressTo = async (value) => {
+    if (busy || !canEdit) return
+    const next = Math.max(0, Math.min(100, Math.round(Number(value))))
+    if (Number.isNaN(next)) {
+      toast.error('Введите число от 0 до 100')
+      haptic('error')
+      return
+    }
+    if (next < currentProgress) {
+      toast.error('Прогресс можно только увеличивать')
+      haptic('error')
+      return
+    }
     if (next === currentProgress) return
     setBusy(true)
     try {
       const data = await updateOrderProgress(order.id, { progress: next })
-      haptic('light')
+      haptic(next === 100 ? 'success' : 'light')
       applyResult(data)
     } catch (e) {
       haptic('error')
@@ -76,6 +90,9 @@ export default function ExecutorOrderDetailModal({
       setBusy(false)
     }
   }
+
+  const handleApply = () => setProgressTo(inputValue)
+  const handleSetMax = () => setProgressTo(100)
 
   return (
     <motion.div
@@ -209,14 +226,42 @@ export default function ExecutorOrderDetailModal({
               Прогресс 100% — ожидайте проверку студента
             </p>
           ) : (
-            <motion.button
-              whileTap={{ scale: 0.97 }}
-              onClick={handleProgress}
-              disabled={busy}
-              className="w-full bg-blue-500 active:bg-blue-600 disabled:opacity-50 text-white py-3 rounded-lg font-semibold text-sm flex items-center justify-center gap-1.5"
-            >
-              <FiPlus size={16} />+{PROGRESS_STEP}% прогресс
-            </motion.button>
+            <div className="space-y-2">
+              <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                Обновить прогресс
+              </p>
+              <div className="flex gap-2 items-center">
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={currentProgress}
+                  max={100}
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleApply()
+                  }}
+                  className="flex-1 px-4 py-3 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 focus:outline-none focus:border-blue-500 text-sm"
+                />
+                <span className="text-sm text-gray-500 dark:text-gray-400">%</span>
+                <motion.button
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleApply}
+                  disabled={busy}
+                  className="bg-blue-500 active:bg-blue-600 disabled:opacity-50 text-white px-4 py-3 rounded-lg font-semibold text-sm flex items-center gap-1.5"
+                >
+                  <FiCheck size={15} /> Применить
+                </motion.button>
+              </div>
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                onClick={handleSetMax}
+                disabled={busy}
+                className="w-full bg-purple-500 active:bg-purple-600 disabled:opacity-50 text-white py-3 rounded-lg font-semibold text-sm flex items-center justify-center gap-1.5"
+              >
+                <FiZap size={16} /> Сразу 100%
+              </motion.button>
+            </div>
           )}
         </div>
 

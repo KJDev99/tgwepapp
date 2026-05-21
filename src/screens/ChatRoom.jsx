@@ -9,16 +9,6 @@ import { prepareFile, validateFile } from '../utils/files'
 import FilePreview from '../components/FilePreview'
 import AttachmentView from '../components/AttachmentView'
 
-const STATUS_LABELS = {
-  connecting: { text: 'Подключение...', color: 'text-yellow-500' },
-  open: { text: 'Онлайн', color: 'text-green-500' },
-  reconnecting: { text: 'Переподключение...', color: 'text-yellow-500' },
-  closed: { text: 'Не подключено', color: 'text-gray-400' },
-  error: { text: 'Ошибка', color: 'text-red-500' },
-  failed: { text: 'Не удалось подключиться', color: 'text-red-500' },
-  idle: { text: '', color: 'text-gray-400' },
-}
-
 const MAX_TOTAL_FILES = 10
 
 export default function ChatRoom({ roomId, onBack }) {
@@ -78,9 +68,26 @@ export default function ChatRoom({ roomId, onBack }) {
 
   const { status, attempts, send, retry } = useChatSocket(roomId, { onMessage: handleIncoming })
 
+  const isFirstScrollRef = useRef(true)
+  const scrollToBottom = useCallback((behavior = 'auto') => {
+    endRef.current?.scrollIntoView({ behavior, block: 'end' })
+  }, [])
+
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-  }, [messages.length])
+    if (messages.length === 0) return
+    const behavior = isFirstScrollRef.current ? 'auto' : 'smooth'
+    isFirstScrollRef.current = false
+    const t1 = requestAnimationFrame(() => scrollToBottom(behavior))
+    const t2 = setTimeout(() => scrollToBottom('auto'), 250)
+    return () => {
+      cancelAnimationFrame(t1)
+      clearTimeout(t2)
+    }
+  }, [messages.length, scrollToBottom])
+
+  const handleMediaLoad = useCallback(() => {
+    scrollToBottom('auto')
+  }, [scrollToBottom])
 
   const addFiles = useCallback(async (incoming) => {
     if (incoming.length === 0) return
@@ -167,7 +174,6 @@ export default function ChatRoom({ roomId, onBack }) {
     setSending(false)
   }
 
-  const statusInfo = STATUS_LABELS[status] || STATUS_LABELS.idle
   const canSend = (message.trim() || files.length > 0) && !sending && !processingFiles
 
   return (
@@ -189,7 +195,6 @@ export default function ChatRoom({ roomId, onBack }) {
         </motion.button>
         <div className="flex-1 min-w-0">
           <h1 className="font-semibold text-sm truncate">Чат</h1>
-          <p className={`text-[11px] ${statusInfo.color}`}>{statusInfo.text}</p>
         </div>
       </header>
 
@@ -242,7 +247,12 @@ export default function ChatRoom({ roomId, onBack }) {
                   {Array.isArray(msg.attachments) && msg.attachments.length > 0 && (
                     <div className="mt-1 space-y-1">
                       {msg.attachments.map((att) => (
-                        <AttachmentView key={att.id} attachment={att} isMine={isMine} />
+                        <AttachmentView
+                          key={att.id}
+                          attachment={att}
+                          isMine={isMine}
+                          onLoad={handleMediaLoad}
+                        />
                       ))}
                     </div>
                   )}
