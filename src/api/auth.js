@@ -41,3 +41,12 @@ export async function fetchReviews({ page = 1, limit = 20 } = {}) {
   const { data } = await api.get(ENDPOINTS.reviews, { params: { page, limit } })
   return data
 }
+
+export async function changeGroup(groupId) {
+  const { data } = await api.put(ENDPOINTS.groupsChange, {
+    group: groupId,
+    group_id: groupId,
+    groups: [groupId],
+  })
+  return data
+}

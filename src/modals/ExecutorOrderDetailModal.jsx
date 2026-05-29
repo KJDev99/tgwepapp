@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { FiX, FiPaperclip, FiCheck, FiMessageCircle, FiZap } from 'react-icons/fi'
 import toast from 'react-hot-toast'
-import { updateOrderProgress } from '../api/orders'
+import { updateOrderProgress, addOrderExecutor } from '../api/orders'
 import { extractErrorMessage } from '../api/client'
 import { haptic } from '../hooks/useTelegram'
 import { ORDER_STATUS, getStatusInfo } from '../constants/orderStatus'
@@ -31,6 +31,7 @@ function statusToNumber(status) {
 
 export default function ExecutorOrderDetailModal({
   order: initialOrder,
+  user,
   onClose,
   onChanged,
   onOpenChat,
@@ -51,6 +52,27 @@ export default function ExecutorOrderDetailModal({
   const info = getStatusInfo(currentStatusNum, order.status_label || order.status)
   const isFinished = currentStatusNum === 5 || currentStatusNum === 6
   const canEdit = !isFinished && currentProgress < 100
+  const isAvailable = !order.assignment_id && currentStatusNum === 1
+
+  const handleTakeOrder = async () => {
+    if (busy || !user) {
+      toast.error('Данные пользователя не найдены')
+      return
+    }
+    setBusy(true)
+    try {
+      await addOrderExecutor(order.id, user.id)
+      haptic('success')
+      toast.success('Вы успешно приняли заказ!')
+      onChanged?.()
+      onClose?.()
+    } catch (e) {
+      haptic('error')
+      toast.error(extractErrorMessage(e, 'Не удалось принять заказ'))
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const typeName =
     typeof order.type_order === 'object' && order.type_order
@@ -225,6 +247,15 @@ export default function ExecutorOrderDetailModal({
             <p className="text-sm text-center py-2 text-yellow-700 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg px-3">
               Прогресс 100% — ожидайте проверку студента
             </p>
+          ) : isAvailable ? (
+            <motion.button
+              whileTap={{ scale: 0.98 }}
+              onClick={handleTakeOrder}
+              disabled={busy}
+              className="w-full bg-green-500 active:bg-green-600 disabled:opacity-50 text-white font-semibold py-3.5 rounded-xl shadow-md flex items-center justify-center gap-2 mt-2"
+            >
+              {busy ? 'Принятие...' : 'Взять заказ'}
+            </motion.button>
           ) : (
             <div className="space-y-2">
               <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
@@ -265,7 +296,7 @@ export default function ExecutorOrderDetailModal({
           )}
         </div>
 
-        {onOpenChat && (
+        {onOpenChat && !isAvailable && (
           <div className="flex gap-2 mt-4">
             <motion.button
               whileTap={{ scale: 0.97 }}

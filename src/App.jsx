@@ -76,6 +76,7 @@ export default function App() {
   const [activeOrderId, setActiveOrderId] = useState(null)
   const [activeExecutorOrder, setActiveExecutorOrder] = useState(null)
   const [ordersRefreshKey, setOrdersRefreshKey] = useState(0)
+  const [isSelectingRole, setIsSelectingRole] = useState(false)
 
   const bumpOrders = useCallback(() => setOrdersRefreshKey((k) => k + 1), [])
   const handleOpenOrder = useCallback((id) => {
@@ -113,7 +114,7 @@ export default function App() {
 
   const handleLogout = useCallback(() => {
     haptic('warning')
-    closeWebApp()
+    setIsSelectingRole(true)
   }, [])
 
   const showBackButton = role !== null && (currentTab !== 'home' || activeChat !== null)
@@ -130,8 +131,17 @@ export default function App() {
     if (loading) return <ScreenFallback />
     if (error) return <ErrorScreen message={error} onRetry={retry} />
 
-    if (!user || isNewUser || !role) {
-      return <Registration onCompleted={refreshProfile} />
+    if (!user || isNewUser || !role || isSelectingRole) {
+      return (
+        <Registration
+          onCompleted={() => {
+            refreshProfile()
+            setIsSelectingRole(false)
+          }}
+          isChangingRole={isSelectingRole}
+          onCancelChange={() => setIsSelectingRole(false)}
+        />
+      )
     }
 
     if (role === 'student') {
@@ -323,6 +333,7 @@ export default function App() {
             {activeExecutorOrder !== null && (
               <ExecutorOrderDetailModal
                 order={activeExecutorOrder}
+                user={user}
                 onClose={() => setActiveExecutorOrder(null)}
                 onChanged={bumpOrders}
                 onOpenChat={handleOpenChatTab}

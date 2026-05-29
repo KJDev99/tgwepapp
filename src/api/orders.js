@@ -115,3 +115,11 @@ export async function createOrderReview(orderId, payload) {
   const { data } = await api.post(ENDPOINTS.orderReview(orderId), payload)
   return data
 }
+
+export async function fetchAllExecutorsOrders({ page = 1, limit = 20, type_order = '', price = '' } = {}) {
+  const params = { page, limit }
+  if (type_order) params.type_order = type_order
+  if (price) params.price = price
+  const { data } = await api.get(ENDPOINTS.ordersAllExecutors, { params })
+  return unwrapList(data)
+}

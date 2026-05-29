@@ -2,10 +2,11 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { FiUser, FiBriefcase, FiArrowLeft, FiCheck, FiBookOpen, FiChevronDown } from 'react-icons/fi'
-import { fetchGroups, fetchTagSkills, updateProfile, updateSkills } from '../api/auth'
+import { fetchGroups, fetchTagSkills, updateProfile, updateSkills, changeGroup } from '../api/auth'
 import { haptic, useTelegramPhoto } from '../hooks/useTelegram'
 import { extractErrorMessage } from '../api/client'
 import Avatar from '../components/Avatar'
+import { useAuth } from '../hooks/useAuth.jsx'
 
 const EXECUTOR_KEYWORDS = ['executor', 'исполнитель', 'performer', 'ijrochi']
 
@@ -14,7 +15,8 @@ function isExecutorGroup(group) {
   return EXECUTOR_KEYWORDS.some((k) => n.includes(k))
 }
 
-export default function Registration({ onCompleted }) {
+export default function Registration({ onCompleted, isChangingRole = false, onCancelChange }) {
+  const { user } = useAuth()
   const [groups, setGroups] = useState([])
   const [skills, setSkills] = useState([])
   const [loadingGroups, setLoadingGroups] = useState(true)
@@ -27,6 +29,7 @@ export default function Registration({ onCompleted }) {
   const [selectedSkillIds, setSelectedSkillIds] = useState([])
   const [skillsOpen, setSkillsOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [pendingGroupChange, setPendingGroupChange] = useState(null)
 
   const tgPhotoUrl = useTelegramPhoto()
   const skillsRef = useRef(null)
@@ -76,8 +79,34 @@ export default function Registration({ onCompleted }) {
 
   const handleSelectRole = (group) => {
     haptic('selection')
+    if (isChangingRole) {
+      const currentGroup = user?.groups?.[0]
+      if (currentGroup?.id === group.id) {
+        onCancelChange?.()
+        return
+      }
+      setPendingGroupChange(group)
+      return
+    }
     setSelectedGroupId(group.id)
     setStep('profile')
+  }
+
+  const confirmGroupChange = async () => {
+    if (!pendingGroupChange) return
+    setSaving(true)
+    try {
+      await changeGroup(pendingGroupChange.id)
+      haptic('success')
+      toast.success('Роль успешно изменена')
+      await onCompleted?.()
+      setPendingGroupChange(null)
+    } catch (err) {
+      haptic('error')
+      toast.error(extractErrorMessage(err, 'Не удалось сменить роль'))
+    } finally {
+      setSaving(false)
+    }
   }
 
   const save = async () => {
@@ -139,9 +168,79 @@ export default function Registration({ onCompleted }) {
     )
   }
 
-  if (step === 'role') {
+  if (pendingGroupChange) {
+    const currentGroup = user?.groups?.[0]
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-6 safe-area bg-gradient-to-b from-blue-50/40 to-light dark:from-gray-900 dark:to-dark">
+        <motion.h1
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-xl font-bold mb-6 text-center"
+        >
+          Подтвердите смену роли
+        </motion.h1>
+
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="w-full max-w-xs bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-200 dark:border-gray-700 mb-6 flex flex-col items-center gap-4"
+        >
+          <div className="flex items-center justify-between w-full text-center">
+            <div className="flex-1 min-w-0">
+              <span className="text-[10px] text-gray-500 block mb-1">Текущая роль</span>
+              <span className="font-semibold text-xs bg-gray-100 dark:bg-gray-700 px-2.5 py-1.5 rounded-lg block truncate">
+                {currentGroup?.name || '—'}
+              </span>
+            </div>
+            <div className="px-2 text-gray-400 font-bold">→</div>
+            <div className="flex-1 min-w-0">
+              <span className="text-[10px] text-gray-500 block mb-1">Новая роль</span>
+              <span className="font-semibold text-xs bg-blue-500 text-white px-2.5 py-1.5 rounded-lg block truncate">
+                {pendingGroupChange.name}
+              </span>
+            </div>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-2 leading-relaxed">
+            Вы уверены, что хотите сменить роль? Данные вашего профиля останутся прежними, но изменится доступный функционал.
+          </p>
+        </motion.div>
+
+        <div className="w-full max-w-xs space-y-2">
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            onClick={confirmGroupChange}
+            disabled={saving}
+            className="w-full bg-blue-500 active:bg-blue-600 disabled:opacity-50 text-white font-semibold py-3.5 rounded-xl shadow-md flex items-center justify-center gap-2"
+          >
+            {saving ? 'Смена...' : 'Подтвердить'}
+          </motion.button>
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setPendingGroupChange(null)}
+            disabled={saving}
+            className="w-full bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white font-semibold py-3.5 rounded-xl"
+          >
+            Отмена
+          </motion.button>
+        </div>
+      </div>
+    )
+  }
+
+  if (step === 'role') {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-6 safe-area bg-gradient-to-b from-blue-50/40 to-light dark:from-gray-900 dark:to-dark relative">
+        {isChangingRole && (
+          <motion.button
+            onClick={onCancelChange}
+            whileTap={{ scale: 0.95 }}
+            className="text-blue-500 absolute top-4 left-4 text-sm font-medium flex items-center gap-1"
+            style={{ top: 'calc(16px + env(safe-area-inset-top))' }}
+          >
+            <FiArrowLeft size={16} />
+            Назад
+          </motion.button>
+        )}
         <motion.div
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}

@@ -32,6 +32,7 @@ export const ENDPOINTS = {
   telegramAuth: '/auth/telegram-auth/',
   profile: '/auth/profile/',
   groups: '/auth/groups/',
+  groupsChange: '/auth/groups-change/',
   tagSkills: '/auth/tag-skills/',
   reviews: '/auth/reviews/',
   userDetail: (userId) => `/auth/detail/${userId}/`,
@@ -52,6 +53,7 @@ export const ENDPOINTS = {
 
   // Orders - Executor
   ordersExecutor: '/orders/executor/',
+  ordersAllExecutors: '/orders/all-executors/',
   orderProgress: (id) => `/orders/${id}/progress/`,
   orderComplete: (id) => `/orders/${id}/complete/`,
   orderReview: (id) => `/orders/${id}/review/`,
