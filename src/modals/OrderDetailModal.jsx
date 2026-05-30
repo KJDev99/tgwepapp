@@ -493,7 +493,7 @@ function DetailView({ order, executors, executorsLoading, assigningId, onAssign 
       <Row label="Тип" value={order.type_order?.name || '—'} />
       <Row
         label="Срок"
-        value={order.deadline ? new Date(order.deadline).toLocaleDateString('ru-RU') : '—'}
+        value={order.deadline ? new Date(order.deadline).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
       />
       <Row label="Цена" value={order.price ? `${order.price} ₽` : '—'} />
       <Row label="Описание" value={order.description || '—'} multiline />

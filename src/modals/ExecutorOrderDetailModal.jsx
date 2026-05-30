@@ -201,29 +201,31 @@ export default function ExecutorOrderDetailModal({
           <Row label="Тип" value={typeName || '—'} />
           <Row
             label="Срок"
-            value={order.deadline ? new Date(order.deadline).toLocaleDateString('ru-RU') : '—'}
+            value={order.deadline ? new Date(order.deadline).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
           />
           <Row label="Цена" value={order.price ? `${order.price} ₽` : '—'} />
           <Row label="Описание" value={order.description || '—'} multiline />
 
-          <div>
-            <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
-              Прогресс
-            </p>
-            <div className="bg-gray-50 dark:bg-gray-700/40 rounded-lg p-3">
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-1">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${currentProgress}%` }}
-                  transition={{ duration: 0.4 }}
-                  className="bg-blue-500 h-2 rounded-full"
-                />
-              </div>
-              <p className="text-xs text-right text-gray-600 dark:text-gray-400">
-                {currentProgress}%
+          {!isAvailable && (
+            <div>
+              <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
+                Прогресс
               </p>
+              <div className="bg-gray-50 dark:bg-gray-700/40 rounded-lg p-3">
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-1">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${currentProgress}%` }}
+                    transition={{ duration: 0.4 }}
+                    className="bg-blue-500 h-2 rounded-full"
+                  />
+                </div>
+                <p className="text-xs text-right text-gray-600 dark:text-gray-400">
+                  {currentProgress}%
+                </p>
+              </div>
             </div>
-          </div>
+          )}
 
           <div>
             <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
