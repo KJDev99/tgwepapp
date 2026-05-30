@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { FiLogOut, FiRefreshCw, FiChevronLeft, FiChevronRight, FiClock, FiDollarSign, FiSearch, FiX } from 'react-icons/fi'
+import { FiLogOut, FiRefreshCw, FiChevronLeft, FiChevronRight, FiClock, FiDollarSign, FiX, FiSend } from 'react-icons/fi'
+import toast from 'react-hot-toast'
 import { SkeletonCard } from '../components/Skeleton'
 import Avatar from '../components/Avatar'
-import { fetchAllExecutorsOrders, fetchOrderTypes } from '../api/orders'
+import { fetchAllExecutorsOrders, fetchOrderTypes, sendInviteResponse, fetchMyInviteResponses } from '../api/orders'
+import { extractErrorMessage } from '../api/client'
 import { getStatusInfo } from '../constants/orderStatus'
-import { useTelegramPhoto } from '../hooks/useTelegram'
+import { useTelegramPhoto, haptic } from '../hooks/useTelegram'
 
 export default function ExecutorHome({ user, onLogout, onOpenOrder, refreshKey }) {
   const [orders, setOrders] = useState([])
@@ -16,10 +18,18 @@ export default function ExecutorHome({ user, onLogout, onOpenOrder, refreshKey }
   const [page, setPage] = useState(1)
   const [limit] = useState(10)
   const [typeOrder, setTypeOrder] = useState('')
-  const [localPrice, setLocalPrice] = useState('')
-  const [price, setPrice] = useState('')
+  const [localMinPrice, setLocalMinPrice] = useState('')
+  const [localMaxPrice, setLocalMaxPrice] = useState('')
+  const [minPrice, setMinPrice] = useState('')
+  const [maxPrice, setMaxPrice] = useState('')
   const [orderTypes, setOrderTypes] = useState([])
   const [localRefresh, setLocalRefresh] = useState(0)
+
+  // Track sent proposals to prevent duplicates
+  const [sentProposals, setSentProposals] = useState(new Set())
+  const [proposalModal, setProposalModal] = useState(null) // order object when modal is open
+  const [proposalText, setProposalText] = useState('')
+  const [sendingProposal, setSendingProposal] = useState(false)
 
   const displayName = user?.full_name || user?.username || 'друг'
   const tgPhotoUrl = useTelegramPhoto()
@@ -32,14 +42,25 @@ export default function ExecutorHome({ user, onLogout, onOpenOrder, refreshKey }
       .catch(() => {})
   }, [])
 
-  // Debounce price input
+  // Load sent proposals to know which orders already have proposals
+  useEffect(() => {
+    fetchMyInviteResponses()
+      .then((list) => {
+        const ids = new Set(list.map((item) => item.order))
+        setSentProposals(ids)
+      })
+      .catch(() => {})
+  }, [localRefresh, refreshKey])
+
+  // Debounce price inputs
   useEffect(() => {
     const t = setTimeout(() => {
-      setPrice(localPrice)
+      setMinPrice(localMinPrice)
+      setMaxPrice(localMaxPrice)
       setPage(1)
     }, 450)
     return () => clearTimeout(t)
-  }, [localPrice])
+  }, [localMinPrice, localMaxPrice])
 
   // Load available orders
   const loadOrders = useCallback(async () => {
@@ -50,7 +71,8 @@ export default function ExecutorHome({ user, onLogout, onOpenOrder, refreshKey }
         page,
         limit,
         type_order: typeOrder,
-        price,
+        min_price: minPrice,
+        max_price: maxPrice,
       })
       setOrders(res.items)
       setCount(res.count)
@@ -61,7 +83,7 @@ export default function ExecutorHome({ user, onLogout, onOpenOrder, refreshKey }
     } finally {
       setLoading(false)
     }
-  }, [page, limit, typeOrder, price, refreshKey, localRefresh])
+  }, [page, limit, typeOrder, minPrice, maxPrice, refreshKey, localRefresh])
 
   useEffect(() => {
     loadOrders()
@@ -73,12 +95,58 @@ export default function ExecutorHome({ user, onLogout, onOpenOrder, refreshKey }
 
   const handleClearFilters = () => {
     setTypeOrder('')
-    setLocalPrice('')
-    setPrice('')
+    setLocalMinPrice('')
+    setLocalMaxPrice('')
+    setMinPrice('')
+    setMaxPrice('')
     setPage(1)
   }
 
+  // Open proposal modal
+  const openProposalModal = (order, e) => {
+    e.stopPropagation()
+    if (sentProposals.has(order.id)) {
+      toast.error('Вы уже отправили предложение на этот заказ')
+      haptic('error')
+      return
+    }
+    haptic('selection')
+    setProposalText('')
+    setProposalModal(order)
+  }
+
+  // Send proposal
+  const handleSendProposal = async () => {
+    if (sendingProposal) return
+    if (!proposalText.trim()) {
+      toast.error('Введите описание предложения')
+      haptic('error')
+      return
+    }
+    if (sentProposals.has(proposalModal.id)) {
+      toast.error('Вы уже отправили предложение на этот заказ')
+      haptic('error')
+      setProposalModal(null)
+      return
+    }
+    setSendingProposal(true)
+    try {
+      await sendInviteResponse(proposalModal.id, proposalText.trim())
+      haptic('success')
+      toast.success('Предложение отправлено!')
+      setSentProposals((prev) => new Set([...prev, proposalModal.id]))
+      setProposalModal(null)
+      setProposalText('')
+    } catch (e) {
+      haptic('error')
+      toast.error(extractErrorMessage(e, 'Не удалось отправить предложение'))
+    } finally {
+      setSendingProposal(false)
+    }
+  }
+
   const totalPages = Math.ceil(count / limit)
+  const hasFilters = typeOrder || minPrice || maxPrice
 
   return (
     <div className="min-h-screen px-4 pt-4 pb-28 safe-area">
@@ -117,7 +185,7 @@ export default function ExecutorHome({ user, onLogout, onOpenOrder, refreshKey }
 
       {/* Filters Section */}
       <div className="mb-5 space-y-3">
-        {/* Price Input and Clear Filters */}
+        {/* Min/Max Price Inputs */}
         <div className="flex gap-2">
           <div className="relative flex-1">
             <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
@@ -126,25 +194,46 @@ export default function ExecutorHome({ user, onLogout, onOpenOrder, refreshKey }
             <input
               type="number"
               inputMode="numeric"
-              placeholder="Фильтр по цене (₽)..."
-              value={localPrice}
-              onChange={(e) => setLocalPrice(e.target.value)}
+              placeholder="Мин. цена (₽)"
+              value={localMinPrice}
+              onChange={(e) => setLocalMinPrice(e.target.value)}
               className="w-full pl-8 pr-8 py-2.5 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
-            {localPrice && (
+            {localMinPrice && (
               <button
-                onClick={() => setLocalPrice('')}
+                onClick={() => setLocalMinPrice('')}
                 className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
               >
                 <FiX size={15} />
               </button>
             )}
           </div>
-          {(typeOrder || price) && (
+          <div className="relative flex-1">
+            <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+              <FiDollarSign size={15} />
+            </span>
+            <input
+              type="number"
+              inputMode="numeric"
+              placeholder="Макс. цена (₽)"
+              value={localMaxPrice}
+              onChange={(e) => setLocalMaxPrice(e.target.value)}
+              className="w-full pl-8 pr-8 py-2.5 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+            {localMaxPrice && (
+              <button
+                onClick={() => setLocalMaxPrice('')}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+              >
+                <FiX size={15} />
+              </button>
+            )}
+          </div>
+          {hasFilters && (
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={handleClearFilters}
-              className="px-3 py-2.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg text-xs font-semibold"
+              className="px-3 py-2.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg text-xs font-semibold shrink-0"
             >
               Сброс
             </motion.button>
@@ -211,6 +300,7 @@ export default function ExecutorHome({ user, onLogout, onOpenOrder, refreshKey }
             const info = getStatusInfo(1, order.status)
             const typeName = order.type_order?.name || order.type_order || '—'
             const formattedPrice = order.price ? `${Number(order.price).toLocaleString('ru-RU')} ₽` : '—'
+            const alreadySent = sentProposals.has(order.id)
 
             return (
               <motion.div
@@ -242,7 +332,7 @@ export default function ExecutorHome({ user, onLogout, onOpenOrder, refreshKey }
                   )}
                 </div>
 
-                <div className="flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400">
+                <div className="flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400 mb-3">
                   {order.deadline ? (
                     <span className="flex items-center gap-1">
                       <FiClock size={12} />
@@ -257,6 +347,21 @@ export default function ExecutorHome({ user, onLogout, onOpenOrder, refreshKey }
                     </span>
                   )}
                 </div>
+
+                {/* Proposal button */}
+                <motion.button
+                  whileTap={{ scale: 0.97 }}
+                  onClick={(e) => openProposalModal(order, e)}
+                  disabled={alreadySent}
+                  className={`w-full py-2.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors ${
+                    alreadySent
+                      ? 'bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                      : 'bg-green-500 active:bg-green-600 text-white shadow-sm'
+                  }`}
+                >
+                  <FiSend size={14} />
+                  {alreadySent ? 'Предложение отправлено' : 'Отправить предложение'}
+                </motion.button>
               </motion.div>
             )
           })}
@@ -289,6 +394,90 @@ export default function ExecutorHome({ user, onLogout, onOpenOrder, refreshKey }
           </motion.button>
         </div>
       )}
+
+      {/* Proposal Modal */}
+      <AnimatePresence>
+        {proposalModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end"
+            onClick={() => setProposalModal(null)}
+          >
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              className="w-full bg-white dark:bg-gray-800 rounded-t-2xl p-5 max-w-md mx-auto"
+              style={{ paddingBottom: 'calc(20px + env(safe-area-inset-bottom))' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-bold">Отправить предложение</h2>
+                <motion.button
+                  whileTap={{ scale: 0.92 }}
+                  onClick={() => setProposalModal(null)}
+                  className="p-2 active:bg-gray-100 dark:active:bg-gray-700 rounded-lg"
+                  aria-label="Закрыть"
+                >
+                  <FiX size={20} />
+                </motion.button>
+              </div>
+
+              <div className="mb-4">
+                <div className="bg-gray-50 dark:bg-gray-700/40 rounded-lg p-3 mb-3">
+                  <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">
+                    Заказ
+                  </p>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    {proposalModal.title || `Заказ #${proposalModal.id}`}
+                  </p>
+                  {proposalModal.price && (
+                    <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 font-medium">
+                      {Number(proposalModal.price).toLocaleString('ru-RU')} ₽
+                    </p>
+                  )}
+                </div>
+
+                <label className="block text-sm font-medium mb-2">
+                  Ваше предложение
+                </label>
+                <textarea
+                  value={proposalText}
+                  onChange={(e) => setProposalText(e.target.value)}
+                  placeholder="Опишите ваше предложение, опыт, сроки..."
+                  maxLength={1000}
+                  className="w-full px-4 py-3 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 focus:outline-none focus:border-blue-500 min-h-28 resize-none text-sm"
+                />
+                <p className="text-[10px] text-gray-400 mt-1 text-right">
+                  {proposalText.length}/1000
+                </p>
+              </div>
+
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                onClick={handleSendProposal}
+                disabled={sendingProposal || !proposalText.trim()}
+                className="w-full bg-green-500 active:bg-green-600 disabled:opacity-50 text-white font-semibold py-3.5 rounded-xl shadow-md flex items-center justify-center gap-2"
+              >
+                {sendingProposal ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Отправка...
+                  </>
+                ) : (
+                  <>
+                    <FiSend size={16} />
+                    Отправить предложение
+                  </>
+                )}
+              </motion.button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

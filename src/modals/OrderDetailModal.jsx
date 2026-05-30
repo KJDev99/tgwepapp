@@ -14,7 +14,7 @@ import {
 import toast from 'react-hot-toast'
 import {
   fetchOrderDetail,
-  fetchSuggestedExecutors,
+  fetchOrderDetailExecutors,
   addOrderExecutor,
   updateOrder,
   deleteOrder,
@@ -107,7 +107,7 @@ export default function OrderDetailModal({ orderId, onClose, onChanged, onOpenCh
     }
     let mounted = true
     setExecutorsLoading(true)
-    fetchSuggestedExecutors(order.id)
+    fetchOrderDetailExecutors(order.id)
       .then((list) => {
         if (mounted) setExecutors(list)
       })
@@ -560,7 +560,7 @@ function DetailView({ order, executors, executorsLoading, assigningId, onAssign 
       {editable && (
         <div>
           <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5 mt-1">
-            Рекомендуемые исполнители
+            Предложения исполнителей
           </p>
           {executorsLoading ? (
             <div className="flex justify-center py-3">
@@ -568,43 +568,62 @@ function DetailView({ order, executors, executorsLoading, assigningId, onAssign 
             </div>
           ) : executors.length === 0 ? (
             <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-2">
-              Нет рекомендаций
+              Пока нет предложений
             </p>
           ) : (
             <div className="space-y-2">
-              {executors.map((ex) => (
-                <div
-                  key={ex.id}
-                  className="bg-gray-50 dark:bg-gray-700/40 rounded-lg p-2.5 flex items-center gap-2"
-                >
-                  <Avatar name={ex.name} photoUrl={ex.avatar_url} size={36} />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold truncate">{ex.name}</p>
-                    <div className="flex items-center gap-2 text-[11px] text-gray-500 dark:text-gray-400">
-                      {ex.rating != null && (
-                        <span className="flex items-center gap-0.5">
-                          <FiStar size={11} className="text-yellow-500" />
-                          {ex.rating}
-                        </span>
-                      )}
-                      {ex.speciality && <span className="truncate">{ex.speciality}</span>}
-                    </div>
-                  </div>
-                  <motion.button
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => onAssign(ex.id)}
-                    disabled={assigningId !== null}
-                    className="bg-blue-500 active:bg-blue-600 disabled:opacity-50 text-white p-2 rounded-lg shrink-0"
-                    aria-label="Назначить"
+              {executors.map((ex) => {
+                const executor = ex.executor && typeof ex.executor === 'object' ? ex.executor : ex
+                const executorId = executor.id || ex.executor
+                const executorName = executor.full_name || executor.name || executor.username || `Исполнитель #${executorId}`
+                const executorAvatar = executor.avatar_url || null
+                const description = ex.description || ''
+                return (
+                  <div
+                    key={ex.id || executorId}
+                    className="bg-gray-50 dark:bg-gray-700/40 rounded-lg p-2.5"
                   >
-                    {assigningId === ex.id ? (
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <FiUserPlus size={16} />
+                    <div className="flex items-center gap-2 mb-2">
+                      <Avatar name={executorName} photoUrl={executorAvatar} size={36} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold truncate">{executorName}</p>
+                        <div className="flex items-center gap-2 text-[11px] text-gray-500 dark:text-gray-400">
+                          {executor.rating != null && (
+                            <span className="flex items-center gap-0.5">
+                              <FiStar size={11} className="text-yellow-500" />
+                              {executor.rating}
+                            </span>
+                          )}
+                          {executor.speciality && <span className="truncate">{executor.speciality}</span>}
+                        </div>
+                      </div>
+                      <motion.button
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => onAssign(executorId)}
+                        disabled={assigningId !== null}
+                        className="bg-blue-500 active:bg-blue-600 disabled:opacity-50 text-white p-2 rounded-lg shrink-0"
+                        aria-label="Назначить"
+                      >
+                        {assigningId === executorId ? (
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <FiUserPlus size={16} />
+                        )}
+                      </motion.button>
+                    </div>
+                    {description && (
+                      <div className="bg-white dark:bg-gray-800 rounded-lg p-2.5 ml-11">
+                        <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">
+                          Предложение
+                        </p>
+                        <p className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words">
+                          {description}
+                        </p>
+                      </div>
                     )}
-                  </motion.button>
-                </div>
-              ))}
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>

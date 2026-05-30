@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { FiX, FiPaperclip, FiCheck, FiMessageCircle, FiZap } from 'react-icons/fi'
+import { FiX, FiPaperclip, FiCheck, FiMessageCircle, FiZap, FiSend } from 'react-icons/fi'
 import toast from 'react-hot-toast'
-import { updateOrderProgress, addOrderExecutor } from '../api/orders'
+import { updateOrderProgress, addOrderExecutor, sendInviteResponse, fetchMyInviteResponses } from '../api/orders'
 import { extractErrorMessage } from '../api/client'
 import { haptic } from '../hooks/useTelegram'
 import { ORDER_STATUS, getStatusInfo } from '../constants/orderStatus'
@@ -39,6 +39,10 @@ export default function ExecutorOrderDetailModal({
   const [order, setOrder] = useState(initialOrder)
   const [busy, setBusy] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [proposalText, setProposalText] = useState('')
+  const [proposalSent, setProposalSent] = useState(false)
+  const [sendingProposal, setSendingProposal] = useState(false)
+  const [checkingProposal, setCheckingProposal] = useState(false)
 
   const currentStatusNum = statusToNumber(order?.status)
   const currentProgress = Number(order?.progress) || 0
@@ -46,6 +50,19 @@ export default function ExecutorOrderDetailModal({
   useEffect(() => {
     setInputValue(String(currentProgress))
   }, [currentProgress])
+
+  // Check if proposal already sent for this order
+  useEffect(() => {
+    if (!order?.id) return
+    setCheckingProposal(true)
+    fetchMyInviteResponses()
+      .then((list) => {
+        const already = list.some((item) => item.order === order.id)
+        setProposalSent(already)
+      })
+      .catch(() => {})
+      .finally(() => setCheckingProposal(false))
+  }, [order?.id])
 
   if (!order) return null
 
@@ -71,6 +88,34 @@ export default function ExecutorOrderDetailModal({
       toast.error(extractErrorMessage(e, 'Не удалось принять заказ'))
     } finally {
       setBusy(false)
+    }
+  }
+
+  const handleSendProposal = async () => {
+    if (sendingProposal) return
+    if (!proposalText.trim()) {
+      toast.error('Введите описание предложения')
+      haptic('error')
+      return
+    }
+    if (proposalSent) {
+      toast.error('Вы уже отправили предложение на этот заказ')
+      haptic('error')
+      return
+    }
+    setSendingProposal(true)
+    try {
+      await sendInviteResponse(order.id, proposalText.trim())
+      haptic('success')
+      toast.success('Предложение отправлено!')
+      setProposalSent(true)
+      setProposalText('')
+      onChanged?.()
+    } catch (e) {
+      haptic('error')
+      toast.error(extractErrorMessage(e, 'Не удалось отправить предложение'))
+    } finally {
+      setSendingProposal(false)
     }
   }
 
@@ -248,14 +293,57 @@ export default function ExecutorOrderDetailModal({
               Прогресс 100% — ожидайте проверку студента
             </p>
           ) : isAvailable ? (
-            <motion.button
-              whileTap={{ scale: 0.98 }}
-              onClick={handleTakeOrder}
-              disabled={busy}
-              className="w-full bg-green-500 active:bg-green-600 disabled:opacity-50 text-white font-semibold py-3.5 rounded-xl shadow-md flex items-center justify-center gap-2 mt-2"
-            >
-              {busy ? 'Принятие...' : 'Взять заказ'}
-            </motion.button>
+            <div className="space-y-3 mt-2">
+              {/* Proposal section */}
+              {checkingProposal ? (
+                <div className="flex justify-center py-2">
+                  <div className="w-5 h-5 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : proposalSent ? (
+                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-3 text-center">
+                  <p className="text-sm text-green-700 dark:text-green-300 font-medium flex items-center justify-center gap-1.5">
+                    <FiCheck size={16} />
+                    Предложение отправлено
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">
+                      Ваше предложение
+                    </label>
+                    <textarea
+                      value={proposalText}
+                      onChange={(e) => setProposalText(e.target.value)}
+                      placeholder="Опишите ваше предложение, опыт, сроки..."
+                      maxLength={1000}
+                      className="w-full px-3 py-2.5 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 focus:outline-none focus:border-green-500 min-h-20 resize-none text-sm"
+                    />
+                    <p className="text-[10px] text-gray-400 mt-0.5 text-right">
+                      {proposalText.length}/1000
+                    </p>
+                  </div>
+                  <motion.button
+                    whileTap={{ scale: 0.98 }}
+                    onClick={handleSendProposal}
+                    disabled={sendingProposal || !proposalText.trim()}
+                    className="w-full bg-green-500 active:bg-green-600 disabled:opacity-50 text-white font-semibold py-3.5 rounded-xl shadow-md flex items-center justify-center gap-2"
+                  >
+                    {sendingProposal ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Отправка...
+                      </>
+                    ) : (
+                      <>
+                        <FiSend size={16} />
+                        Отправить предложение
+                      </>
+                    )}
+                  </motion.button>
+                </>
+              )}
+            </div>
           ) : (
             <div className="space-y-2">
               <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">

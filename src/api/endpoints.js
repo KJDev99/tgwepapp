@@ -54,6 +54,8 @@ export const ENDPOINTS = {
   // Orders - Executor
   ordersExecutor: '/orders/executor/',
   ordersAllExecutors: '/orders/all-executors/',
+  inviteResponse: '/orders/invite-response/',
+  orderDetailExecutors: (id) => `/orders/detail/${id}/executor/`,
   orderProgress: (id) => `/orders/${id}/progress/`,
   orderComplete: (id) => `/orders/${id}/complete/`,
   orderReview: (id) => `/orders/${id}/review/`,

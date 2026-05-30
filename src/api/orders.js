@@ -116,10 +116,34 @@ export async function createOrderReview(orderId, payload) {
   return data
 }
 
-export async function fetchAllExecutorsOrders({ page = 1, limit = 20, type_order = '', price = '' } = {}) {
+export async function fetchAllExecutorsOrders({ page = 1, limit = 20, type_order = '', min_price = '', max_price = '' } = {}) {
   const params = { page, limit }
   if (type_order) params.type_order = type_order
-  if (price) params.price = price
+  if (min_price) params.min_price = min_price
+  if (max_price) params.max_price = max_price
   const { data } = await api.get(ENDPOINTS.ordersAllExecutors, { params })
   return unwrapList(data)
+}
+
+// Executor sends a proposal (invite response) for an order
+export async function sendInviteResponse(orderId, description) {
+  const { data } = await api.post(ENDPOINTS.inviteResponse, {
+    order: orderId,
+    description,
+  })
+  return data
+}
+
+// Executor fetches all their sent proposals
+export async function fetchMyInviteResponses() {
+  const { data } = await api.get(ENDPOINTS.inviteResponse)
+  if (Array.isArray(data)) return data
+  return data?.results ?? data?.items ?? []
+}
+
+// Student fetches executors who sent proposals for a specific order (includes description)
+export async function fetchOrderDetailExecutors(orderId) {
+  const { data } = await api.get(ENDPOINTS.orderDetailExecutors(orderId))
+  if (Array.isArray(data)) return data
+  return data?.results ?? data?.items ?? []
 }
