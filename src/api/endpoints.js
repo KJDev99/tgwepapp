@@ -1,5 +1,5 @@
-export const API_BASE = 'https://dev2.time-to-skill.ru/api'
-export const WS_BASE = 'wss://dev2.time-to-skill.ru/ws'
+export const API_BASE = 'https://admin.sparkorders.ru/api'
+export const WS_BASE = 'wss://admin.sparkorders.ru/ws'
 
 let cachedMediaHost = null
 function getMediaHost() {
