@@ -1,5 +1,12 @@
 export const API_BASE = 'https://admin.sparkorders.ru/api'
 export const WS_BASE = 'wss://admin.sparkorders.ru/ws'
+export const SITE_BASE = 'https://admin.sparkorders.ru'
+
+// Legal documents (served at site root, NOT under /api)
+export const LEGAL_ENDPOINTS = {
+  privacyPolicy: `${SITE_BASE}/pirvacy-policy/`,
+  termsOfService: `${SITE_BASE}/terms-of-service/`,
+}
 
 let cachedMediaHost = null
 function getMediaHost() {

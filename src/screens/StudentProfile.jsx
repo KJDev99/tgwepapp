@@ -1,13 +1,17 @@
-import { motion } from 'framer-motion'
-import { FiEdit, FiLogOut, FiMail, FiBookOpen, FiAward } from 'react-icons/fi'
+import { lazy, Suspense, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { FiEdit, FiLogOut, FiMail, FiBookOpen, FiAward, FiShield, FiChevronRight } from 'react-icons/fi'
 import ThemeToggle from '../components/ThemeToggle'
 import Avatar from '../components/Avatar'
 import { haptic, useTelegramPhoto } from '../hooks/useTelegram'
+
+const LegalDocsModal = lazy(() => import('../modals/LegalDocsModal'))
 
 export default function StudentProfile({ user, isDark, onToggleTheme, onLogout, onEditProfile }) {
   const displayName = user?.full_name || user?.username || 'Пользователь'
   const tgPhotoUrl = useTelegramPhoto()
   const photoUrl = user?.avatar_url || tgPhotoUrl
+  const [showLegal, setShowLegal] = useState(false)
 
   return (
     <div className="min-h-screen pb-24 px-4 pt-4 safe-area">
@@ -58,6 +62,24 @@ export default function StudentProfile({ user, isDark, onToggleTheme, onLogout, 
         whileTap={{ scale: 0.98 }}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.08 }}
+        onClick={() => {
+          haptic('light')
+          setShowLegal(true)
+        }}
+        className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 active:bg-gray-50 dark:active:bg-gray-700/60 py-3.5 px-4 rounded-xl flex items-center gap-3 text-sm font-medium mb-5"
+      >
+        <span className="w-9 h-9 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
+          <FiShield size={18} />
+        </span>
+        <span className="flex-1 text-left">Документы и соглашения</span>
+        <FiChevronRight size={18} className="text-gray-400 shrink-0" />
+      </motion.button>
+
+      <motion.button
+        whileTap={{ scale: 0.98 }}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
         onClick={onLogout}
         className="w-full bg-red-500 active:bg-red-600 text-white py-3 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold"
@@ -65,6 +87,12 @@ export default function StudentProfile({ user, isDark, onToggleTheme, onLogout, 
         <FiLogOut size={16} />
         <span>Выход</span>
       </motion.button>
+
+      <Suspense fallback={null}>
+        <AnimatePresence>
+          {showLegal && <LegalDocsModal onClose={() => setShowLegal(false)} />}
+        </AnimatePresence>
+      </Suspense>
     </div>
   )
 }

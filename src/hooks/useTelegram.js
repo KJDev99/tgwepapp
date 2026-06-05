@@ -76,6 +76,24 @@ export function useMainButton({ text, visible, onClick, loading, disabled }) {
   }, [text, visible, onClick, loading, disabled])
 }
 
+export function openLink(url) {
+  if (!url) return false
+  try {
+    if (tg?.openLink) {
+      tg.openLink(url, { try_instant_view: false })
+      return true
+    }
+  } catch {
+    // fallthrough to window.open
+  }
+  try {
+    window.open(url, '_blank', 'noopener,noreferrer')
+    return true
+  } catch {
+    return false
+  }
+}
+
 export function closeWebApp() {
   if (tg?.close) {
     try {

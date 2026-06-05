@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { FiUser, FiBriefcase, FiArrowLeft, FiCheck, FiBookOpen, FiChevronDown } from 'react-icons/fi'
+import { FiUser, FiBriefcase, FiArrowLeft, FiCheck, FiBookOpen, FiChevronDown, FiShield } from 'react-icons/fi'
 import { fetchGroups, fetchTagSkills, updateProfile, updateSkills, changeGroup } from '../api/auth'
 import { haptic, useTelegramPhoto } from '../hooks/useTelegram'
 import { extractErrorMessage } from '../api/client'
 import Avatar from '../components/Avatar'
+import LegalDocs from '../components/LegalDocs'
 import { useAuth } from '../hooks/useAuth.jsx'
 
 const EXECUTOR_KEYWORDS = ['executor', 'исполнитель', 'performer', 'ijrochi']
@@ -30,6 +31,8 @@ export default function Registration({ onCompleted, isChangingRole = false, onCa
   const [skillsOpen, setSkillsOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [pendingGroupChange, setPendingGroupChange] = useState(null)
+  const [legalReady, setLegalReady] = useState(false)
+  const [legalAccepted, setLegalAccepted] = useState(false)
 
   const tgPhotoUrl = useTelegramPhoto()
   const skillsRef = useRef(null)
@@ -109,6 +112,21 @@ export default function Registration({ onCompleted, isChangingRole = false, onCa
     }
   }
 
+  const proceedToLegal = () => {
+    if (!fullName.trim()) {
+      toast.error('Введите имя')
+      haptic('error')
+      return
+    }
+    if (!selectedGroupId) {
+      toast.error('Выберите роль')
+      haptic('error')
+      return
+    }
+    haptic('selection')
+    setStep('legal')
+  }
+
   const save = async () => {
     if (!fullName.trim()) {
       toast.error('Введите имя')
@@ -117,6 +135,11 @@ export default function Registration({ onCompleted, isChangingRole = false, onCa
     }
     if (!selectedGroupId) {
       toast.error('Выберите роль')
+      haptic('error')
+      return
+    }
+    if (!legalAccepted) {
+      toast.error('Подтвердите согласие с документами')
       haptic('error')
       return
     }
@@ -296,6 +319,79 @@ export default function Registration({ onCompleted, isChangingRole = false, onCa
     )
   }
 
+  if (step === 'legal') {
+    return (
+      <div className="min-h-screen flex flex-col px-5 pt-4 pb-28 safe-area">
+        <div className="w-full max-w-md mx-auto">
+          <motion.button
+            onClick={() => {
+              haptic('selection')
+              setStep('profile')
+            }}
+            whileTap={{ scale: 0.95 }}
+            className="text-blue-500 mb-5 text-sm font-medium flex items-center gap-1"
+          >
+            <FiArrowLeft size={16} />
+            Назад
+          </motion.button>
+
+          <div className="flex flex-col items-center mb-6 text-center">
+            <div className="mb-3 p-3.5 rounded-2xl bg-blue-500/10">
+              <FiShield size={40} className="text-blue-500" />
+            </div>
+            <h1 className="text-xl font-bold">Документы и соглашения</h1>
+            <p className="text-gray-500 dark:text-gray-400 text-sm mt-1.5 leading-relaxed max-w-xs">
+              Перед началом работы откройте и прочитайте оба документа. Это
+              необходимо для использования сервиса и подключения оплаты.
+            </p>
+          </div>
+
+          <LegalDocs requireOpen onReadyChange={setLegalReady} />
+
+          <label
+            className={`flex items-start gap-3 mt-6 p-3.5 rounded-xl border transition-colors cursor-pointer ${
+              legalReady
+                ? 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800'
+                : 'border-gray-200/60 dark:border-gray-700/50 bg-gray-50/50 dark:bg-gray-800/40 opacity-60 cursor-not-allowed'
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={legalAccepted}
+              disabled={!legalReady}
+              onChange={(e) => {
+                haptic('selection')
+                setLegalAccepted(e.target.checked)
+              }}
+              className="mt-0.5 w-5 h-5 accent-blue-500 shrink-0"
+            />
+            <span className="text-sm leading-snug text-gray-700 dark:text-gray-300">
+              Я ознакомился(ась) с документами и принимаю условия
+              Пользовательского соглашения и Политики обработки персональных
+              данных.
+            </span>
+          </label>
+
+          {!legalReady && (
+            <p className="text-[11px] text-gray-400 mt-2 text-center">
+              Откройте оба документа, чтобы продолжить
+            </p>
+          )}
+
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            type="button"
+            onClick={save}
+            disabled={saving || !legalAccepted}
+            className="w-full bg-blue-500 active:bg-blue-600 disabled:opacity-50 text-white font-semibold py-4 rounded-xl mt-5 shadow-md flex items-center justify-center gap-2"
+          >
+            {saving ? 'Сохранение...' : 'Завершить регистрацию'}
+          </motion.button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen flex flex-col px-5 pt-4 pb-24 safe-area">
       <div className="w-full max-w-md mx-auto">
@@ -321,7 +417,7 @@ export default function Registration({ onCompleted, isChangingRole = false, onCa
         <form
           onSubmit={(e) => {
             e.preventDefault()
-            save()
+            proceedToLegal()
           }}
           className="space-y-4"
         >
@@ -444,10 +540,9 @@ export default function Registration({ onCompleted, isChangingRole = false, onCa
           <motion.button
             whileTap={{ scale: 0.98 }}
             type="submit"
-            disabled={saving}
-            className="w-full bg-blue-500 active:bg-blue-600 disabled:opacity-50 text-white font-semibold py-4 rounded-xl mt-4 shadow-md"
+            className="w-full bg-blue-500 active:bg-blue-600 text-white font-semibold py-4 rounded-xl mt-4 shadow-md"
           >
-            {saving ? 'Сохранение...' : 'Завершить регистрацию'}
+            Продолжить
           </motion.button>
         </form>
       </div>
