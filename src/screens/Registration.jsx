@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { FiUser, FiBriefcase, FiArrowLeft, FiCheck, FiBookOpen, FiChevronDown, FiShield } from 'react-icons/fi'
+import { FiUser, FiBriefcase, FiArrowLeft, FiCheck, FiChevronDown, FiShield } from 'react-icons/fi'
 import { fetchGroups, fetchTagSkills, updateProfile, updateSkills, changeGroup } from '../api/auth'
 import { haptic, useTelegramPhoto } from '../hooks/useTelegram'
 import { extractErrorMessage } from '../api/client'
 import Avatar from '../components/Avatar'
 import LegalDocs from '../components/LegalDocs'
+import Logo from '../components/Logo'
 import { useAuth } from '../hooks/useAuth.jsx'
 
 const EXECUTOR_KEYWORDS = ['executor', 'исполнитель', 'performer', 'ijrochi']
@@ -268,9 +269,9 @@ export default function Registration({ onCompleted, isChangingRole = false, onCa
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{ type: 'spring', stiffness: 100 }}
-          className="mb-5 p-4 rounded-2xl bg-blue-500/10"
+          className="mb-6"
         >
-          <FiBookOpen size={56} className="text-blue-500" />
+          <Logo size={96} className="rounded-[22px] shadow-xl shadow-black/10 dark:shadow-black/40" />
         </motion.div>
         <motion.h1
           initial={{ opacity: 0, y: 20 }}
