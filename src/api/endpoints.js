@@ -45,6 +45,7 @@ export const ENDPOINTS = {
   groupsChange: '/auth/groups-change/',
   tagSkills: '/auth/tag-skills/',
   reviews: '/auth/reviews/',
+  profileReview: (userId) => `/auth/profile-review/${userId}/`,
   userDetail: (userId) => `/auth/detail/${userId}/`,
 
   // Chat

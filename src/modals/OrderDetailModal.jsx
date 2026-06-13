@@ -27,6 +27,7 @@ import { confirmPayment, cancelPayment } from '../api/payment'
 import PaymentMethodModal from './PaymentMethodModal'
 import ReviewModal from './ReviewModal'
 import StarRating from '../components/StarRating'
+import ExecutorReviews from '../components/ExecutorReviews'
 import { extractErrorMessage } from '../api/client'
 import { haptic } from '../hooks/useTelegram'
 import { getStatusInfo, ORDER_STATUS } from '../constants/orderStatus'
@@ -803,6 +804,7 @@ function DetailView({ order, executors, executorsLoading, assigningId, onAssign 
                         </p>
                       </div>
                     )}
+                    <ExecutorReviews userId={executorId} />
                   </div>
                 )
               })}

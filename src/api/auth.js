@@ -48,6 +48,20 @@ export async function fetchReviews({ page = 1, limit = 50 } = {}) {
   }
 }
 
+// Отзывы о конкретном пользователе (по его id) — для просмотра чужого профиля/предложения
+export async function fetchUserReviews(userId, { page = 1, limit = 50 } = {}) {
+  const { data } = await api.get(ENDPOINTS.profileReview(userId), {
+    params: { page, limit },
+  })
+  if (Array.isArray(data)) {
+    return { items: data, count: data.length }
+  }
+  return {
+    items: data?.results ?? data?.items ?? [],
+    count: data?.count ?? (data?.results ?? data?.items ?? []).length,
+  }
+}
+
 export async function changeGroup(groupId) {
   const { data } = await api.put(ENDPOINTS.groupsChange, {
     group: groupId,
