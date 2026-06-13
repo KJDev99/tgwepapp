@@ -37,9 +37,15 @@ export async function fetchUserDetail(userId) {
   return data
 }
 
-export async function fetchReviews({ page = 1, limit = 20 } = {}) {
+export async function fetchReviews({ page = 1, limit = 50 } = {}) {
   const { data } = await api.get(ENDPOINTS.reviews, { params: { page, limit } })
-  return data
+  if (Array.isArray(data)) {
+    return { items: data, count: data.length }
+  }
+  return {
+    items: data?.results ?? data?.items ?? [],
+    count: data?.count ?? (data?.results ?? data?.items ?? []).length,
+  }
 }
 
 export async function changeGroup(groupId) {

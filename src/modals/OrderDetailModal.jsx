@@ -25,6 +25,8 @@ import {
 } from '../api/orders'
 import { confirmPayment, cancelPayment } from '../api/payment'
 import PaymentMethodModal from './PaymentMethodModal'
+import ReviewModal from './ReviewModal'
+import StarRating from '../components/StarRating'
 import { extractErrorMessage } from '../api/client'
 import { haptic } from '../hooks/useTelegram'
 import { getStatusInfo, ORDER_STATUS } from '../constants/orderStatus'
@@ -77,6 +79,16 @@ function isOrderPaid(order) {
   )
 }
 
+// id пользователя-исполнителя, назначенного на заказ (для отзыва)
+function getExecutorUserId(order) {
+  if (!order) return null
+  const ex = order.executor
+  if (ex && typeof ex === 'object') return ex.user ?? ex.id ?? null
+  if (typeof ex === 'number') return ex
+  if (typeof ex === 'string' && ex.trim() && !Number.isNaN(Number(ex))) return Number(ex)
+  return order.executor_id ?? order.executor_user_id ?? null
+}
+
 export default function OrderDetailModal({ orderId, onClose, onChanged, onOpenChat }) {
   const [order, setOrder] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -93,6 +105,8 @@ export default function OrderDetailModal({ orderId, onClose, onChanged, onOpenCh
   const [locallyPaid, setLocallyPaid] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [confirmCancelPay, setConfirmCancelPay] = useState(false)
+  const [showReview, setShowReview] = useState(false)
+  const [reviewed, setReviewed] = useState(false)
 
   const [editTitle, setEditTitle] = useState('')
   const [editDeadline, setEditDeadline] = useState('')
@@ -249,6 +263,8 @@ export default function OrderDetailModal({ orderId, onClose, onChanged, onOpenCh
       }
       setConfirmComplete(false)
       onChanged?.()
+      // После завершения предлагаем оставить отзыв об исполнителе
+      if (!reviewed) setShowReview(true)
     } catch (e) {
       haptic('error')
       toast.error(extractErrorMessage(e, 'Не удалось завершить'))
@@ -447,6 +463,18 @@ export default function OrderDetailModal({ orderId, onClose, onChanged, onOpenCh
                   Завершить можно после 100% прогресса
                 </p>
               )}
+              {statusNum === 5 && !reviewed && (
+                <motion.button
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => {
+                    haptic('selection')
+                    setShowReview(true)
+                  }}
+                  className="w-full bg-yellow-400 active:bg-yellow-500 text-gray-900 py-3 rounded-lg font-semibold text-sm flex items-center justify-center gap-1.5"
+                >
+                  <FiStar size={15} /> Оставить отзыв
+                </motion.button>
+              )}
               <div className="flex gap-2">
                 {onOpenChat && !editable && (
                   <motion.button
@@ -604,6 +632,26 @@ export default function OrderDetailModal({ orderId, onClose, onChanged, onOpenCh
           />
         </div>
       )}
+
+      {showReview && order && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <ReviewModal
+            orderId={order.id}
+            revieweeId={getExecutorUserId(order)}
+            executorName={
+              order.executor?.full_name ||
+              order.executor?.name ||
+              order.executor?.username ||
+              (typeof order.executor === 'string' ? order.executor : '')
+            }
+            onClose={() => setShowReview(false)}
+            onSubmitted={() => {
+              setShowReview(false)
+              setReviewed(true)
+            }}
+          />
+        </div>
+      )}
     </motion.div>
   )
 }
@@ -723,9 +771,9 @@ function DetailView({ order, executors, executorsLoading, assigningId, onAssign 
                         <p className="text-sm font-semibold truncate">{executorName}</p>
                         <div className="flex items-center gap-2 text-[11px] text-gray-500 dark:text-gray-400">
                           {executor.rating != null && (
-                            <span className="flex items-center gap-0.5">
-                              <FiStar size={11} className="text-yellow-500" />
-                              {executor.rating}
+                            <span className="flex items-center gap-1">
+                              <StarRating value={executor.rating} size={11} />
+                              <span className="font-semibold">{Number(executor.rating).toFixed(1)}</span>
                             </span>
                           )}
                           {executor.speciality && <span className="truncate">{executor.speciality}</span>}

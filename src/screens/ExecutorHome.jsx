@@ -4,6 +4,7 @@ import { FiLogOut, FiRefreshCw, FiChevronLeft, FiChevronRight, FiClock, FiDollar
 import toast from 'react-hot-toast'
 import { SkeletonCard } from '../components/Skeleton'
 import Avatar from '../components/Avatar'
+import NotificationsButton from '../components/NotificationsButton'
 import { fetchAllExecutorsOrders, fetchOrderTypes, sendInviteResponse, fetchMyInviteResponses } from '../api/orders'
 import { extractErrorMessage } from '../api/client'
 import { getStatusInfo } from '../constants/orderStatus'
@@ -172,6 +173,7 @@ export default function ExecutorHome({ user, onLogout, onOpenOrder, refreshKey }
           >
             <FiRefreshCw size={18} className={loading ? 'animate-spin' : ''} />
           </motion.button>
+          <NotificationsButton refreshKey={refreshKey} />
           <motion.button
             whileTap={{ scale: 0.92 }}
             onClick={onLogout}

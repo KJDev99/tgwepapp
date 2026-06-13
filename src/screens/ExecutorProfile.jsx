@@ -4,6 +4,7 @@ import { FiEdit, FiLogOut, FiCheckCircle, FiMail, FiBookOpen, FiShield, FiChevro
 import ThemeToggle from '../components/ThemeToggle'
 import Avatar from '../components/Avatar'
 import CardsSection from '../components/CardsSection'
+import ReviewsSection from '../components/ReviewsSection'
 import { haptic, useTelegramPhoto } from '../hooks/useTelegram'
 
 const LegalDocsModal = lazy(() => import('../modals/LegalDocsModal'))
@@ -81,6 +82,8 @@ export default function ExecutorProfile({ user, isDark, onToggleTheme, onLogout,
       </motion.div>
 
       <CardsSection />
+
+      <ReviewsSection overallRating={user?.rating} />
 
       <motion.button
         whileTap={{ scale: 0.98 }}

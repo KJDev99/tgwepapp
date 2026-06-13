@@ -67,6 +67,11 @@ export const ENDPOINTS = {
   orderComplete: (id) => `/orders/${id}/complete/`,
   orderReview: (id) => `/orders/${id}/review/`,
 
+  // Notifications
+  notifications: '/orders/notifications/',
+  notificationsReadAll: '/orders/notifications/read-all/',
+  notificationDetail: (id) => `/orders/notifications/${id}/`,
+
   // Payment
   paymentCards: '/payment/cards/',
   paymentCardDetail: (cardId) => `/payment/card/${cardId}/detaile/`,

@@ -2,6 +2,7 @@ import { motion } from 'framer-motion'
 import { FiPlus, FiLogOut } from 'react-icons/fi'
 import { SkeletonCard } from '../components/Skeleton'
 import Avatar from '../components/Avatar'
+import NotificationsButton from '../components/NotificationsButton'
 import { useStudentOrders } from '../hooks/useOrders'
 import { getStatusInfo } from '../constants/orderStatus'
 import { haptic, useTelegramPhoto } from '../hooks/useTelegram'
@@ -27,14 +28,17 @@ export default function StudentHome({ user, onLogout, onCreateOrder, onOpenOrder
             <p className="text-gray-500 dark:text-gray-400 text-xs">Ваш путеводитель</p>
           </div>
         </div>
-        <motion.button
-          whileTap={{ scale: 0.92 }}
-          onClick={onLogout}
-          className="p-2 rounded-lg bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-300 shrink-0"
-          aria-label="Выйти"
-        >
-          <FiLogOut size={18} />
-        </motion.button>
+        <div className="flex items-center gap-2 shrink-0">
+          <NotificationsButton refreshKey={refreshKey} />
+          <motion.button
+            whileTap={{ scale: 0.92 }}
+            onClick={onLogout}
+            className="p-2 rounded-lg bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-300 shrink-0"
+            aria-label="Выйти"
+          >
+            <FiLogOut size={18} />
+          </motion.button>
+        </div>
       </motion.div>
 
       <motion.div
