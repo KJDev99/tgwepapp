@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { FiLogOut, FiRefreshCw, FiChevronLeft, FiChevronRight, FiClock, FiDollarSign, FiX, FiSend } from 'react-icons/fi'
+import { FiLogOut, FiRefreshCw, FiChevronLeft, FiChevronRight, FiClock, FiDollarSign, FiX, FiSend, FiSearch } from 'react-icons/fi'
 import toast from 'react-hot-toast'
 import { SkeletonCard } from '../components/Skeleton'
 import Avatar from '../components/Avatar'
@@ -21,6 +21,7 @@ export default function ExecutorHome({ user, onLogout, onOpenOrder, refreshKey }
   const [typeOrder, setTypeOrder] = useState('')
   const [localMinPrice, setLocalMinPrice] = useState('')
   const [localMaxPrice, setLocalMaxPrice] = useState('')
+  const [search, setSearch] = useState('')
   const [minPrice, setMinPrice] = useState('')
   const [maxPrice, setMaxPrice] = useState('')
   const [orderTypes, setOrderTypes] = useState([])
@@ -100,6 +101,7 @@ export default function ExecutorHome({ user, onLogout, onOpenOrder, refreshKey }
     setLocalMaxPrice('')
     setMinPrice('')
     setMaxPrice('')
+    setSearch('')
     setPage(1)
   }
 
@@ -147,7 +149,16 @@ export default function ExecutorHome({ user, onLogout, onOpenOrder, refreshKey }
   }
 
   const totalPages = Math.ceil(count / limit)
-  const hasFilters = typeOrder || minPrice || maxPrice
+  const hasFilters = typeOrder || minPrice || maxPrice || search.trim()
+
+  // Поиск по названию заказа (по загруженным заказам)
+  const visibleOrders = search.trim()
+    ? orders.filter((o) =>
+        `${o.title || ''} ${o.description || ''}`
+          .toLowerCase()
+          .includes(search.trim().toLowerCase())
+      )
+    : orders
 
   return (
     <div className="min-h-screen px-4 pt-4 pb-28 safe-area">
@@ -187,6 +198,29 @@ export default function ExecutorHome({ user, onLogout, onOpenOrder, refreshKey }
 
       {/* Filters Section */}
       <div className="mb-5 space-y-3">
+        {/* Search */}
+        <div className="relative">
+          <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+            <FiSearch size={16} />
+          </span>
+          <input
+            type="text"
+            placeholder="Поиск по заказам"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-9 pr-9 py-2.5 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+              aria-label="Очистить"
+            >
+              <FiX size={16} />
+            </button>
+          )}
+        </div>
+
         {/* Min/Max Price Inputs */}
         <div className="flex gap-2">
           <div className="relative flex-1">
@@ -194,11 +228,11 @@ export default function ExecutorHome({ user, onLogout, onOpenOrder, refreshKey }
               <FiDollarSign size={15} />
             </span>
             <input
-              type="number"
+              type="text"
               inputMode="numeric"
               placeholder="Мин. цена (₽)"
               value={localMinPrice}
-              onChange={(e) => setLocalMinPrice(e.target.value)}
+              onChange={(e) => setLocalMinPrice(e.target.value.replace(/\D/g, ''))}
               className="w-full pl-8 pr-8 py-2.5 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
             {localMinPrice && (
@@ -215,11 +249,11 @@ export default function ExecutorHome({ user, onLogout, onOpenOrder, refreshKey }
               <FiDollarSign size={15} />
             </span>
             <input
-              type="number"
+              type="text"
               inputMode="numeric"
               placeholder="Макс. цена (₽)"
               value={localMaxPrice}
-              onChange={(e) => setLocalMaxPrice(e.target.value)}
+              onChange={(e) => setLocalMaxPrice(e.target.value.replace(/\D/g, ''))}
               className="w-full pl-8 pr-8 py-2.5 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
             {localMaxPrice && (
@@ -292,13 +326,13 @@ export default function ExecutorHome({ user, onLogout, onOpenOrder, refreshKey }
         <div className="py-10 text-sm text-center text-red-500 dark:text-red-400">
           Не удалось загрузить заказы
         </div>
-      ) : orders.length === 0 ? (
+      ) : visibleOrders.length === 0 ? (
         <div className="py-10 text-sm text-center text-gray-400">
-          Нет доступных заказов
+          {search.trim() ? 'Ничего не найдено' : 'Нет доступных заказов'}
         </div>
       ) : (
         <div className="space-y-3">
-          {orders.map((order, idx) => {
+          {visibleOrders.map((order, idx) => {
             const info = getStatusInfo(1, order.status)
             const typeName = order.type_order?.name || order.type_order || '—'
             const formattedPrice = order.price ? `${Number(order.price).toLocaleString('ru-RU')} ₽` : '—'

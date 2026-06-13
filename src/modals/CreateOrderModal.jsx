@@ -290,11 +290,11 @@ export default function CreateOrderModal({ onClose, onCreated }) {
               <div>
                 <label className="block text-sm font-medium mb-2">Цена (опционально)</label>
                 <input
-                  type="number"
+                  type="text"
                   value={price}
-                  onChange={(e) => setPrice(e.target.value)}
+                  onChange={(e) => setPrice(e.target.value.replace(/\D/g, ''))}
                   placeholder="5000"
-                  inputMode="decimal"
+                  inputMode="numeric"
                   className="w-full px-4 py-3 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 focus:outline-none focus:border-blue-500 text-sm"
                 />
               </div>

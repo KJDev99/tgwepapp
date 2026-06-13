@@ -2,6 +2,9 @@ export const API_BASE = 'https://admin.sparkorders.ru/api'
 export const WS_BASE = 'wss://admin.sparkorders.ru/ws'
 export const SITE_BASE = 'https://admin.sparkorders.ru'
 
+// Техническая поддержка. ЗАМЕНИТЕ на реальный аккаунт/чат поддержки в Telegram.
+export const SUPPORT_URL = 'https://t.me/spark_support'
+
 // Legal documents (served at site root, NOT under /api)
 export const LEGAL_ENDPOINTS = {
   privacyPolicy: `${SITE_BASE}/pirvacy-policy/`,

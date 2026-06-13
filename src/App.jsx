@@ -268,7 +268,7 @@ export default function App() {
           </AnimatePresence>
         </Suspense>
 
-        {role && navItems.length > 0 && !hideNav && (
+        {role && navItems.length > 0 && !hideNav && !isSelectingRole && !isNewUser && user && (
           <nav
             className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 dark:bg-gray-900/95 backdrop-blur border-t border-gray-200 dark:border-gray-800 z-30"
             style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}

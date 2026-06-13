@@ -212,14 +212,14 @@ export default function Registration({ onCompleted, isChangingRole = false, onCa
           <div className="flex items-center justify-between w-full text-center">
             <div className="flex-1 min-w-0">
               <span className="text-[10px] text-gray-500 block mb-1">Текущая роль</span>
-              <span className="font-semibold text-xs bg-gray-100 dark:bg-gray-700 px-2.5 py-1.5 rounded-lg block truncate">
+              <span className="font-semibold text-xs bg-gray-100 dark:bg-gray-700 px-2.5 py-1.5 rounded-lg block truncate capitalize">
                 {currentGroup?.name || '—'}
               </span>
             </div>
             <div className="px-2 text-gray-400 font-bold">→</div>
             <div className="flex-1 min-w-0">
               <span className="text-[10px] text-gray-500 block mb-1">Новая роль</span>
-              <span className="font-semibold text-xs bg-blue-500 text-white px-2.5 py-1.5 rounded-lg block truncate">
+              <span className="font-semibold text-xs bg-blue-500 text-white px-2.5 py-1.5 rounded-lg block truncate capitalize">
                 {pendingGroupChange.name}
               </span>
             </div>
@@ -310,7 +310,7 @@ export default function Registration({ onCompleted, isChangingRole = false, onCa
                   }`}
                 >
                   {exec ? <FiBriefcase size={18} /> : <FiUser size={18} />}
-                  <span>{g.name}</span>
+                  <span className="capitalize">{g.name}</span>
                 </motion.button>
               )
             })
@@ -347,35 +347,22 @@ export default function Registration({ onCompleted, isChangingRole = false, onCa
             </p>
           </div>
 
-          <LegalDocs requireOpen onReadyChange={setLegalReady} />
+          <LegalDocs
+            requireOpen
+            onReadyChange={(r) => {
+              setLegalReady(r)
+              setLegalAccepted(r)
+            }}
+          />
 
-          <label
-            className={`flex items-start gap-3 mt-6 p-3.5 rounded-xl border transition-colors cursor-pointer ${
-              legalReady
-                ? 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800'
-                : 'border-gray-200/60 dark:border-gray-700/50 bg-gray-50/50 dark:bg-gray-800/40 opacity-60 cursor-not-allowed'
-            }`}
-          >
-            <input
-              type="checkbox"
-              checked={legalAccepted}
-              disabled={!legalReady}
-              onChange={(e) => {
-                haptic('selection')
-                setLegalAccepted(e.target.checked)
-              }}
-              className="mt-0.5 w-5 h-5 accent-blue-500 shrink-0"
-            />
-            <span className="text-sm leading-snug text-gray-700 dark:text-gray-300">
-              Я ознакомился(ась) с документами и принимаю условия
-              Пользовательского соглашения и Политики обработки персональных
-              данных.
-            </span>
-          </label>
+          <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-4 leading-relaxed text-center">
+            Отметьте галочкой каждый документ — это подтверждает, что вы
+            ознакомились с ним и принимаете его условия.
+          </p>
 
           {!legalReady && (
             <p className="text-[11px] text-gray-400 mt-2 text-center">
-              Откройте оба документа, чтобы продолжить
+              Откройте и отметьте оба документа, чтобы продолжить
             </p>
           )}
 

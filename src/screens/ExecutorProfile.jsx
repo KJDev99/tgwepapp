@@ -5,6 +5,7 @@ import ThemeToggle from '../components/ThemeToggle'
 import Avatar from '../components/Avatar'
 import CardsSection from '../components/CardsSection'
 import ReviewsSection from '../components/ReviewsSection'
+import ProfileExtras from '../components/ProfileExtras'
 import { haptic, useTelegramPhoto } from '../hooks/useTelegram'
 
 const LegalDocsModal = lazy(() => import('../modals/LegalDocsModal'))
@@ -84,6 +85,8 @@ export default function ExecutorProfile({ user, isDark, onToggleTheme, onLogout,
       <CardsSection />
 
       <ReviewsSection overallRating={user?.rating} />
+
+      <ProfileExtras />
 
       <motion.button
         whileTap={{ scale: 0.98 }}

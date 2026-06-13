@@ -23,6 +23,7 @@ export default function LegalDocs({ requireOpen = false, onReadyChange }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [opened, setOpened] = useState({})
+  const [accepted, setAccepted] = useState({})
 
   const load = useCallback(() => {
     setLoading(true)
@@ -42,14 +43,24 @@ export default function LegalDocs({ requireOpen = false, onReadyChange }) {
 
   useEffect(() => {
     if (!requireOpen || !onReadyChange) return
-    const ready = docs.length > 0 && docs.every((d) => opened[d.key])
+    // готово, когда каждый документ открыт И отмечен галочкой
+    const ready = docs.length > 0 && docs.every((d) => accepted[d.key])
     onReadyChange(ready)
-  }, [requireOpen, onReadyChange, docs, opened])
+  }, [requireOpen, onReadyChange, docs, accepted])
 
   const handleOpen = (doc) => {
     haptic('selection')
     openLink(officeViewerUrl(doc.url))
     setOpened((prev) => ({ ...prev, [doc.key]: true }))
+  }
+
+  const toggleAccept = (doc) => {
+    if (!opened[doc.key]) {
+      haptic('error')
+      return
+    }
+    haptic('selection')
+    setAccepted((prev) => ({ ...prev, [doc.key]: !prev[doc.key] }))
   }
 
   if (loading) {
@@ -78,31 +89,53 @@ export default function LegalDocs({ requireOpen = false, onReadyChange }) {
     <div className="space-y-3">
       {docs.map((doc) => {
         const isOpened = Boolean(opened[doc.key])
+        const isAccepted = Boolean(accepted[doc.key])
         return (
-          <motion.button
+          <div
             key={doc.key}
-            type="button"
-            whileTap={{ scale: 0.98 }}
-            onClick={() => handleOpen(doc)}
-            className="w-full flex items-center gap-3 text-left bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-3.5 active:bg-gray-100 dark:active:bg-gray-700/60 transition-colors"
+            className="flex items-center gap-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-3.5"
           >
-            <span className="shrink-0 w-10 h-10 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center">
-              <FiFileText size={20} />
-            </span>
-            <span className="flex-1 min-w-0">
-              <span className="block text-sm font-medium leading-snug">{doc.title}</span>
-              <span className="block text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
-                Нажмите, чтобы открыть и прочитать
-              </span>
-            </span>
-            {requireOpen && isOpened ? (
-              <span className="shrink-0 text-green-500 flex items-center gap-1 text-xs font-medium">
-                <FiCheck size={16} />
-              </span>
-            ) : (
-              <FiExternalLink size={18} className="shrink-0 text-gray-400" />
+            {/* Чек-бокс согласия рядом с документом (только в режиме согласия) */}
+            {requireOpen && (
+              <button
+                type="button"
+                onClick={() => toggleAccept(doc)}
+                disabled={!isOpened}
+                aria-label="Согласен с документом"
+                className={`shrink-0 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${
+                  isAccepted
+                    ? 'bg-blue-500 border-blue-500 text-white'
+                    : isOpened
+                      ? 'border-gray-300 dark:border-gray-500'
+                      : 'border-gray-200 dark:border-gray-700 opacity-50 cursor-not-allowed'
+                }`}
+              >
+                {isAccepted && <FiCheck size={15} />}
+              </button>
             )}
-          </motion.button>
+
+            <motion.button
+              type="button"
+              whileTap={{ scale: 0.98 }}
+              onClick={() => handleOpen(doc)}
+              className="flex-1 min-w-0 flex items-center gap-3 text-left active:opacity-80 transition-opacity"
+            >
+              <span className="shrink-0 w-10 h-10 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center">
+                <FiFileText size={20} />
+              </span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-sm font-medium leading-snug">{doc.title}</span>
+                <span className="block text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                  {requireOpen && !isOpened
+                    ? 'Откройте, затем отметьте галочкой'
+                    : requireOpen && isOpened
+                      ? 'Документ открыт — отметьте согласие'
+                      : 'Нажмите, чтобы открыть и прочитать'}
+                </span>
+              </span>
+              <FiExternalLink size={18} className="shrink-0 text-gray-400" />
+            </motion.button>
+          </div>
         )
       })}
     </div>

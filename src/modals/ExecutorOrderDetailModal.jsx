@@ -69,7 +69,9 @@ export default function ExecutorOrderDetailModal({
   const info = getStatusInfo(currentStatusNum, order.status_label || order.status)
   const isFinished = currentStatusNum === 5 || currentStatusNum === 6
   const canEdit = !isFinished && currentProgress < 100
-  const isAvailable = !order.assignment_id && currentStatusNum === 1
+  // исполнитель назначен на заказ (это его работа)
+  const isMine = Boolean(order.assignment_id)
+  const isAvailable = !isMine && currentStatusNum === 1
 
   const handleTakeOrder = async () => {
     if (busy || !user) {
@@ -206,7 +208,7 @@ export default function ExecutorOrderDetailModal({
           <Row label="Цена" value={order.price ? `${order.price} ₽` : '—'} />
           <Row label="Описание" value={order.description || '—'} multiline />
 
-          {!isAvailable && (
+          {isMine && (
             <div>
               <p className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
                 Прогресс
@@ -290,11 +292,11 @@ export default function ExecutorOrderDetailModal({
             <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-2">
               Заказ {info.label.toLowerCase()}
             </p>
-          ) : currentProgress >= 100 ? (
+          ) : isMine && currentProgress >= 100 ? (
             <p className="text-sm text-center py-2 text-yellow-700 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg px-3">
               Прогресс 100% — ожидайте проверку студента
             </p>
-          ) : isAvailable ? (
+          ) : !isMine ? (
             <div className="space-y-3 mt-2">
               {/* Proposal section */}
               {checkingProposal ? (
@@ -353,12 +355,10 @@ export default function ExecutorOrderDetailModal({
               </p>
               <div className="flex gap-2 items-center">
                 <input
-                  type="number"
+                  type="text"
                   inputMode="numeric"
-                  min={currentProgress}
-                  max={100}
                   value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
+                  onChange={(e) => setInputValue(e.target.value.replace(/\D/g, '').slice(0, 3))}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') handleApply()
                   }}
@@ -386,7 +386,7 @@ export default function ExecutorOrderDetailModal({
           )}
         </div>
 
-        {onOpenChat && !isAvailable && (
+        {onOpenChat && isMine && (
           <div className="flex gap-2 mt-4">
             <motion.button
               whileTap={{ scale: 0.97 }}

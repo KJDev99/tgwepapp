@@ -106,6 +106,23 @@ export function closeWebApp() {
   return false
 }
 
+// Добавление иконки приложения на главный экран телефона (Bot API 8.0+)
+export function canAddToHomeScreen() {
+  return typeof tg?.addToHomeScreen === 'function'
+}
+
+export function addToHomeScreen() {
+  if (typeof tg?.addToHomeScreen === 'function') {
+    try {
+      tg.addToHomeScreen()
+      return true
+    } catch {
+      // ignore
+    }
+  }
+  return false
+}
+
 export function haptic(type = 'light') {
   const hf = tg?.HapticFeedback
   if (!hf) return

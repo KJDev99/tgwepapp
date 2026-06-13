@@ -109,10 +109,10 @@ export default function PayoutModal({ onClose, onDone }) {
             <label className="block text-sm font-medium mb-2">Сумма вывода</label>
             <div className="relative mb-4">
               <input
-                type="number"
-                inputMode="decimal"
+                type="text"
+                inputMode="numeric"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={(e) => setAmount(e.target.value.replace(/\D/g, ''))}
                 placeholder="0"
                 className="w-full px-4 py-3 pr-10 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 focus:outline-none focus:border-blue-500 text-lg font-semibold"
               />
