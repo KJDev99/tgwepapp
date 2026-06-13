@@ -66,6 +66,17 @@ export const ENDPOINTS = {
   orderProgress: (id) => `/orders/${id}/progress/`,
   orderComplete: (id) => `/orders/${id}/complete/`,
   orderReview: (id) => `/orders/${id}/review/`,
+
+  // Payment
+  paymentCards: '/payment/cards/',
+  paymentCardDetail: (cardId) => `/payment/card/${cardId}/detaile/`,
+  paymentConfirmCard: '/payment/confirm-card/',
+  paymentCardPayment: '/payment/card-payment/',
+  paymentNewCardPayment: '/payment/new-card-payment/',
+  paymentConfirmPayment: (orderId) => `/payment/confirm-payment/${orderId}/`,
+  paymentCancelPayment: (orderId) => `/payment/cancel-payment/${orderId}/`,
+  paymentPayout: '/payment/payout/',
+  paymentAllPayout: '/payment/all-payout/',
 }
 
 export const wsChat = (roomId, token) =>

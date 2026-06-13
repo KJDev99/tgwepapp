@@ -10,6 +10,9 @@ import {
   FiUserPlus,
   FiCheck,
   FiMessageCircle,
+  FiLock,
+  FiCheckCircle,
+  FiSlash,
 } from 'react-icons/fi'
 import toast from 'react-hot-toast'
 import {
@@ -20,6 +23,8 @@ import {
   deleteOrder,
   completeOrder,
 } from '../api/orders'
+import { confirmPayment, cancelPayment } from '../api/payment'
+import PaymentMethodModal from './PaymentMethodModal'
 import { extractErrorMessage } from '../api/client'
 import { haptic } from '../hooks/useTelegram'
 import { getStatusInfo, ORDER_STATUS } from '../constants/orderStatus'
@@ -60,6 +65,18 @@ function isEditable(order) {
   return false
 }
 
+// Определяет, оплачен ли заказ (средства заморожены в escrow).
+// Бэкенд может вернуть разные поля — проверяем самые вероятные.
+function isOrderPaid(order) {
+  if (!order) return false
+  if (order.is_paid === true || order.paid === true) return true
+  const statusFields = [order.payment_status, order.payment?.status]
+  const paidStates = ['paid', 'hold', 'frozen', 'authorized', 'pending', 'waiting_for_capture', 'succeeded']
+  return statusFields.some(
+    (s) => typeof s === 'string' && paidStates.includes(s.toLowerCase())
+  )
+}
+
 export default function OrderDetailModal({ orderId, onClose, onChanged, onOpenChat }) {
   const [order, setOrder] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -72,6 +89,10 @@ export default function OrderDetailModal({ orderId, onClose, onChanged, onOpenCh
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [completing, setCompleting] = useState(false)
   const [confirmComplete, setConfirmComplete] = useState(false)
+  const [showPayment, setShowPayment] = useState(false)
+  const [locallyPaid, setLocallyPaid] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const [confirmCancelPay, setConfirmCancelPay] = useState(false)
 
   const [editTitle, setEditTitle] = useState('')
   const [editDeadline, setEditDeadline] = useState('')
@@ -215,9 +236,14 @@ export default function OrderDetailModal({ orderId, onClose, onChanged, onOpenCh
     if (completing) return
     setCompleting(true)
     try {
+      // Подтверждаем оплату (capture) — деньги уходят исполнителю
+      const paid = isOrderPaid(order) || locallyPaid
+      if (paid) {
+        await confirmPayment(order.id, order.price)
+      }
       const data = await completeOrder(order.id, { status: 5, progress: 100 })
       haptic('success')
-      toast.success('Заказ закрыт')
+      toast.success(paid ? 'Оплата подтверждена, заказ закрыт' : 'Заказ закрыт')
       if (data && typeof data === 'object') {
         setOrder((prev) => ({ ...prev, ...data }))
       }
@@ -228,6 +254,36 @@ export default function OrderDetailModal({ orderId, onClose, onChanged, onOpenCh
       toast.error(extractErrorMessage(e, 'Не удалось завершить'))
     } finally {
       setCompleting(false)
+    }
+  }
+
+  const handlePaid = () => {
+    setShowPayment(false)
+    setLocallyPaid(true)
+    // перезагружаем заказ, чтобы подтянуть актуальный статус оплаты
+    fetchOrderDetail(order.id)
+      .then((updated) => setOrder(updated))
+      .catch(() => {})
+    onChanged?.()
+  }
+
+  const handleCancelPayment = async () => {
+    if (cancelling) return
+    setCancelling(true)
+    try {
+      await cancelPayment(order.id)
+      haptic('success')
+      toast.success('Оплата отменена, средства возвращены')
+      setLocallyPaid(false)
+      setConfirmCancelPay(false)
+      const updated = await fetchOrderDetail(order.id).catch(() => null)
+      if (updated) setOrder(updated)
+      onChanged?.()
+    } catch (e) {
+      haptic('error')
+      toast.error(extractErrorMessage(e, 'Не удалось отменить оплату'))
+    } finally {
+      setCancelling(false)
     }
   }
 
@@ -319,8 +375,40 @@ export default function OrderDetailModal({ orderId, onClose, onChanged, onOpenCh
           const isFinished = statusNum === 5 || statusNum === 6
           const progress = Number(order.progress) || 0
           const canComplete = !editable && !isFinished && progress >= 100
+          const amount = Number(order.price) || 0
+          const paid = isOrderPaid(order) || locallyPaid
+          // оплатить можно после назначения исполнителя (статус >= 2) и до завершения
+          const canPay = !editable && !isFinished && !paid && statusNum >= 2 && amount > 0
           return (
             <div className="flex flex-col gap-2 mt-4">
+              {paid && !isFinished && (
+                <div className="flex items-center justify-between gap-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg px-3 py-2.5">
+                  <span className="flex items-center gap-1.5 text-sm font-medium text-green-700 dark:text-green-300">
+                    <FiCheckCircle size={15} /> Оплачено · средства заморожены
+                  </span>
+                  <button
+                    onClick={() => {
+                      haptic('warning')
+                      setConfirmCancelPay(true)
+                    }}
+                    className="text-xs text-red-500 active:text-red-600 font-medium flex items-center gap-1 shrink-0"
+                  >
+                    <FiSlash size={12} /> Отменить
+                  </button>
+                </div>
+              )}
+              {canPay && (
+                <motion.button
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => {
+                    haptic('selection')
+                    setShowPayment(true)
+                  }}
+                  className="w-full bg-blue-500 active:bg-blue-600 text-white py-3 rounded-lg font-semibold text-sm flex items-center justify-center gap-1.5"
+                >
+                  <FiLock size={15} /> Оплатить {amount.toLocaleString('ru-RU')} ₽
+                </motion.button>
+              )}
               {editable && (
                 <div className="flex gap-2">
                   <motion.button
@@ -415,7 +503,9 @@ export default function OrderDetailModal({ orderId, onClose, onChanged, onOpenCh
             >
               <h3 className="font-semibold text-base mb-2">Завершить заказ?</h3>
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                Работа будет принята и заказ закрыт.
+                {isOrderPaid(order) || locallyPaid
+                  ? `Работа будет принята, а ${(Number(order.price) || 0).toLocaleString('ru-RU')} ₽ переведены исполнителю. Это действие нельзя отменить.`
+                  : 'Работа будет принята и заказ закрыт.'}
               </p>
               <div className="flex gap-2">
                 <button
@@ -469,7 +559,51 @@ export default function OrderDetailModal({ orderId, onClose, onChanged, onOpenCh
             </motion.div>
           </div>
         )}
+
+        {confirmCancelPay && (
+          <div
+            className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4"
+            onClick={() => setConfirmCancelPay(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-gray-800 rounded-xl p-5 w-full max-w-xs"
+            >
+              <h3 className="font-semibold text-base mb-2">Отменить оплату?</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                Замороженные средства вернутся на вашу карту.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setConfirmCancelPay(false)}
+                  className="flex-1 bg-gray-200 dark:bg-gray-700 py-2.5 rounded-lg text-sm font-semibold"
+                >
+                  Назад
+                </button>
+                <button
+                  onClick={handleCancelPayment}
+                  disabled={cancelling}
+                  className="flex-1 bg-red-500 active:bg-red-600 disabled:opacity-50 text-white py-2.5 rounded-lg text-sm font-semibold"
+                >
+                  {cancelling ? '...' : 'Отменить оплату'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
       </motion.div>
+
+      {showPayment && order && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <PaymentMethodModal
+            order={order}
+            onClose={() => setShowPayment(false)}
+            onPaid={handlePaid}
+          />
+        </div>
+      )}
     </motion.div>
   )
 }

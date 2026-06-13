@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { FiEdit, FiLogOut, FiMail, FiBookOpen, FiAward, FiShield, FiChevronRight } from 'react-icons/fi'
 import ThemeToggle from '../components/ThemeToggle'
 import Avatar from '../components/Avatar'
+import CardsSection from '../components/CardsSection'
 import { haptic, useTelegramPhoto } from '../hooks/useTelegram'
 
 const LegalDocsModal = lazy(() => import('../modals/LegalDocsModal'))
@@ -57,6 +58,8 @@ export default function StudentProfile({ user, isDark, onToggleTheme, onLogout, 
           <span>Редактировать профиль</span>
         </motion.button>
       </motion.div>
+
+      <CardsSection />
 
       <motion.button
         whileTap={{ scale: 0.98 }}
